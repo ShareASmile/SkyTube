@@ -17,27 +17,28 @@
 
 package free.rm.skytube.businessobjects.YouTube;
 
-import android.util.Log;
-
 import com.google.api.services.youtube.YouTube;
 import com.google.api.services.youtube.model.Playlist;
 import com.google.api.services.youtube.model.PlaylistListResponse;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
+import free.rm.skytube.app.SkyTubeApp;
 import free.rm.skytube.businessobjects.YouTube.POJOs.YouTubeAPI;
 import free.rm.skytube.businessobjects.YouTube.POJOs.YouTubeAPIKey;
 import free.rm.skytube.businessobjects.YouTube.POJOs.YouTubeChannel;
 import free.rm.skytube.businessobjects.YouTube.POJOs.YouTubePlaylist;
-import free.rm.skytube.businessobjects.YouTube.Tasks.GetChannelPlaylistsTask;
+import free.rm.skytube.gui.businessobjects.adapters.PlaylistsGridAdapter;
 
 
 /**
  * Returns a list of YouTube playlists for a specific channel.
  *
- * <p>Do not run this directly, but rather use {@link GetChannelPlaylistsTask}.</p>
+ * <p>Do not run this directly, but rather use
+ * {@link YouTubeTasks#getChannelPlaylists(GetChannelPlaylists, PlaylistsGridAdapter, boolean)}.</p>
  */
 public class GetChannelPlaylists {
 	protected YouTube.Playlists.List playlistList = null;
@@ -48,9 +49,7 @@ public class GetChannelPlaylists {
 
 	private YouTubeChannel channel;
 
-	private static final String	TAG = GetChannelPlaylists.class.getSimpleName();
-
-	public void init() throws IOException {
+	public GetChannelPlaylists() throws IOException {
 		playlistList = YouTubeAPI.create().playlists().list("id, snippet, contentDetails");
 		playlistList.setKey(YouTubeAPIKey.get().getYouTubeAPIKey());
 		playlistList.setFields("items(id, snippet/title, snippet/description, snippet/thumbnails, snippet/publishedAt, contentDetails/itemCount)," +
@@ -65,32 +64,31 @@ public class GetChannelPlaylists {
 			playlistList.setChannelId(channel.getId());
 	}
 
-	public List<YouTubePlaylist> getNextPlaylists() {
-		List<Playlist> playlistList = null;
+	public List<YouTubePlaylist> getNextPlaylists() throws IOException {
+
+		SkyTubeApp.nonUiThread();
 
 		if (!noMorePlaylistPages()) {
-			try {
-				// set the page token/id to retrieve
-				this.playlistList.setPageToken(nextPageToken);
+			List<Playlist> playlistList = null;
+			// set the page token/id to retrieve
+			this.playlistList.setPageToken(nextPageToken);
 
-				// communicate with YouTube
-				PlaylistListResponse listResponse = this.playlistList.execute();
+			// communicate with YouTube
+			PlaylistListResponse listResponse = this.playlistList.execute();
 
-				// get playlists
-				playlistList = listResponse.getItems();
+			// get playlists
+			playlistList = listResponse.getItems();
 
-				// set the next page token
-				nextPageToken = listResponse.getNextPageToken();
+			// set the next page token
+			nextPageToken = listResponse.getNextPageToken();
 
-				// if nextPageToken is null, it means that there are no more videos
-				if (nextPageToken == null)
-					noMorePlaylistPages = true;
-			} catch (IOException ex) {
-				Log.e(TAG, ex.getLocalizedMessage());
-			}
+			// if nextPageToken is null, it means that there are no more videos
+			if (nextPageToken == null)
+				noMorePlaylistPages = true;
+			return toYouTubePlaylistList(playlistList);
 		}
+		return Collections.emptyList();
 
-		return toYouTubePlaylistList(playlistList);
 	}
 
 	public boolean noMorePlaylistPages() {

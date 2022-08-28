@@ -18,10 +18,12 @@
 package free.rm.skytube.gui.activities;
 
 import android.view.Menu;
+import android.os.Bundle;
 
 import androidx.appcompat.app.AppCompatActivity;
 
 import free.rm.skytube.businessobjects.YouTube.POJOs.YouTubeChannel;
+import free.rm.skytube.databinding.ActivityMainBinding;
 import free.rm.skytube.gui.businessobjects.MainActivityListener;
 
 /**
@@ -29,11 +31,11 @@ import free.rm.skytube.gui.businessobjects.MainActivityListener;
  * contains a bunch of mostly no-op methods.
  */
 public abstract class BaseActivity extends AppCompatActivity implements MainActivityListener {
+	protected ActivityMainBinding binding;
+
 	// No-op methods that aren't necessarily needed by all classes that extend this one
 	protected void onOptionsMenuCreated(Menu menu) {}
-	public void onLayoutSet() {};
-	@Override
-	public void onChannelClick(YouTubeChannel channel) {}
+	public void onLayoutSet() {}
 	@Override
 	public void onChannelClick(String channelId) {}
 	public void redrawPanel() {}
@@ -54,4 +56,11 @@ public abstract class BaseActivity extends AppCompatActivity implements MainActi
 	}
 
 	public void onSessionStarting() {}
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+
+        binding = ActivityMainBinding.inflate(getLayoutInflater());
+    }
 }

@@ -1,13 +1,16 @@
 package free.rm.skytube.businessobjects.YouTube.POJOs;
 
+import org.ocpsoft.prettytime.PrettyTime;
+
 import java.io.Serializable;
+import java.time.Instant;
 
 public class CardData implements Serializable {
     protected String              id;
     protected String              title;
     protected String              description;
     protected Long                publishTimestamp;
-    protected Boolean             publishTimestampExact;
+    protected boolean             publishTimestampExact;
     protected String              thumbnailUrl;
 
     /**
@@ -46,11 +49,11 @@ public class CardData implements Serializable {
         this.description = description;
     }
 
-    public void setPublishTimestampExact(Boolean publishTimestampExact) {
+    public void setPublishTimestampExact(boolean publishTimestampExact) {
         this.publishTimestampExact = publishTimestampExact;
     }
 
-    public Boolean getPublishTimestampExact() {
+    public boolean getPublishTimestampExact() {
         return publishTimestampExact;
     }
 
@@ -77,8 +80,9 @@ public class CardData implements Serializable {
     public final String getPublishDatePretty() {
         long now = System.currentTimeMillis();
         // if pretty is not yet calculated, or the publish date was generated more than (1 hour) PUBLISH_DATE_VALIDITY_TIME ago...
-        if (publishTimestamp != null && (publishDatePretty == null || PUBLISH_DATE_VALIDITY_TIME < now - publishDatePrettyCalculationTime)) {
-            this.publishDatePretty = new PrettyTimeEx().format(publishTimestamp);
+        if (publishTimestamp != null && (publishDatePretty == null ||
+                PUBLISH_DATE_VALIDITY_TIME < now - publishDatePrettyCalculationTime)) {
+            this.publishDatePretty = new PrettyTime().format(Instant.ofEpochMilli(publishTimestamp));
             this.publishDatePrettyCalculationTime = now;
         }
         return publishDatePretty != null ? publishDatePretty : "???";
@@ -98,11 +102,10 @@ public class CardData implements Serializable {
 
     @Override
     public String toString() {
-        final StringBuilder sb = new StringBuilder(this.getClass().getSimpleName()).append('{');
-        sb.append("id='").append(id).append('\'');
-        sb.append(", title='").append(title).append('\'');
-        sb.append(", description='").append(description).append('\'');
-        sb.append('}');
-        return sb.toString();
+        return this.getClass().getSimpleName() + '{' +
+                "id='" + id + '\'' +
+                ", title='" + title + '\'' +
+                ", description='" + description + '\'' +
+                '}';
     }
 }

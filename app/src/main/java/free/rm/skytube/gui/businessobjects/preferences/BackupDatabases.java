@@ -31,7 +31,6 @@ import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
@@ -57,13 +56,24 @@ public class BackupDatabases {
 			R.string.pref_use_default_newpipe_backend,
 			R.string.pref_key_subscriptions_alphabetical_order,
 			R.string.pref_youtube_api_key,
+			R.string.pref_key_default_content_country,
 			R.string.pref_key_default_tab_name,
 			R.string.pref_key_switch_volume_and_brightness,
 			R.string.pref_key_disable_screen_gestures,
 			R.string.pref_key_mobile_network_usage_policy,
 			R.string.pref_key_download_to_separate_directories,
 			R.string.pref_key_video_download_folder,
-			R.string.pref_key_hide_tabs
+			R.string.pref_key_minimum_res,
+			R.string.pref_key_maximum_res,
+			R.string.pref_key_video_quality,
+			R.string.pref_key_minimum_res_mobile,
+			R.string.pref_key_maximum_res_mobile,
+			R.string.pref_key_video_quality_on_mobile,
+			R.string.pref_key_video_download_minimum_resolution,
+			R.string.pref_key_video_download_maximum_resolution,
+			R.string.pref_key_video_quality_for_downloads,
+			R.string.pref_key_hide_tabs,
+			R.string.pref_key_playback_speed
 	};
 
 	/**
@@ -90,18 +100,16 @@ public class BackupDatabases {
 		channelFilteringDb.close();
 		searchHistoryDb.close();
 
-		ZipOutput databasesZip = new ZipOutput(backupPath);
+		try (ZipOutput databasesZip = new ZipOutput(backupPath)) {
+			// backup the databases inside a zip file
+			databasesZip.addFile(subscriptionsDb.getDatabasePath());
+			databasesZip.addFile(bookmarksDb.getDatabasePath());
+			databasesZip.addFile(playbackDb.getDatabasePath());
+			databasesZip.addFile(channelFilteringDb.getDatabasePath());
+			databasesZip.addFile(searchHistoryDb.getDatabasePath());
 
-		// backup the databases inside a zip file
-		databasesZip.addFile(subscriptionsDb.getDatabasePath());
-		databasesZip.addFile(bookmarksDb.getDatabasePath());
-		databasesZip.addFile(playbackDb.getDatabasePath());
-		databasesZip.addFile(channelFilteringDb.getDatabasePath());
-		databasesZip.addFile(searchHistoryDb.getDatabasePath());
-
-		databasesZip.addContent(PREFERENCES_JSON, gson.toJson(getImportantKeys()));
-
-		databasesZip.close();
+			databasesZip.addContent(PREFERENCES_JSON, gson.toJson(getImportantKeys()));
+		}
 		return backupPath.getPath();
 	}
 
@@ -112,7 +120,7 @@ public class BackupDatabases {
 		for (int key : KEY_IDS) {
 			String keyStr = SkyTubeApp.getStr(key);
 			Object value = allPreferences.get(keyStr);
-			Log.i(TAG, "Saving " + keyStr + " as " + value);
+			Log.i(TAG, String.format("Saving %s as %s", keyStr, value));
 			result.put(keyStr, value);
 		}
 		return result;
@@ -132,7 +140,7 @@ public class BackupDatabases {
 		ChannelFilteringDb  channelFilteringDb = ChannelFilteringDb.getChannelFilteringDb();
 		SearchHistoryDb     searchHistoryDb = SearchHistoryDb.getSearchHistoryDb();
 
-        File                databasesDirectory = subscriptionsDb.getDatabaseDirectory();
+		File                databasesDirectory = subscriptionsDb.getDatabaseDirectory();
 
 		// close the databases
 		subscriptionsDb.close();
@@ -141,9 +149,9 @@ public class BackupDatabases {
 		channelFilteringDb.close();
 		searchHistoryDb.close();
 
-        // extract the databases from the backup zip file
-        ZipFile databasesZip = new ZipFile(new File(backupFilePath));
-        Map<String, ZipFile.JsonFile> result = databasesZip.unzip(databasesDirectory);
+		// extract the databases from the backup zip file
+		ZipFile databasesZip = new ZipFile(new File(backupFilePath));
+		Map<String, ZipFile.JsonFile> result = databasesZip.unzip(databasesDirectory);
 		loadPreferencesFromJson(result);
 	}
 
@@ -158,7 +166,7 @@ public class BackupDatabases {
 				String keyStr = SkyTubeApp.getStr(key);
 				Object newValue = preferences.get(keyStr);
 				if (newValue != null) {
-					Log.i(TAG, "Setting " + keyStr + " to " + newValue);
+					Log.i(TAG, String.format("Setting %s to %s", keyStr, newValue));
 					if (newValue instanceof String) {
 						editor.putString(keyStr, (String) newValue);
 					} else if (newValue instanceof Long) {
@@ -175,10 +183,14 @@ public class BackupDatabases {
 					} else if (newValue instanceof Boolean) {
 						editor.putBoolean(keyStr, (Boolean) newValue);
 					} else {
-						Log.e(TAG, "Failed to set preference: " + keyStr + " from " + newValue + "(type="+newValue.getClass()+")");
+						Log.e(TAG, String.format("Failed to set preference: %s from %s (type=%s)", keyStr, newValue, newValue.getClass()));
 					}
+				} else {
+					Log.i(TAG, "Removing "+ keyStr );
+					editor.remove(keyStr);
 				}
 			}
+			editor.commit();
 		}
 	}
 

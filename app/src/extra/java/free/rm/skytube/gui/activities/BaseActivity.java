@@ -23,18 +23,17 @@ import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
-import android.preference.PreferenceManager;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.LinearLayout;
-import android.widget.ProgressBar;
 
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.mediarouter.media.MediaRouteSelector;
 import androidx.mediarouter.media.MediaRouter;
+import androidx.preference.PreferenceManager;
 
 import com.afollestad.materialdialogs.MaterialDialog;
 import com.google.android.gms.cast.CastMediaControlIntent;
@@ -55,23 +54,22 @@ import com.google.android.gms.common.images.WebImage;
 import com.google.gson.Gson;
 import com.sothree.slidinguppanel.SlidingUpPanelLayout;
 
-import butterknife.BindView;
-import butterknife.ButterKnife;
+import org.schabi.newpipe.extractor.stream.StreamInfo;
+
 import free.rm.skytube.BuildConfig;
 import free.rm.skytube.R;
 import free.rm.skytube.app.SkyTubeApp;
+import free.rm.skytube.app.StreamSelectionPolicy;
 import free.rm.skytube.businessobjects.ChromecastListener;
-import free.rm.skytube.businessobjects.GetVideoDetailsTask;
-import free.rm.skytube.businessobjects.YouTube.POJOs.YouTubeChannel;
 import free.rm.skytube.businessobjects.YouTube.POJOs.YouTubeVideo;
-import free.rm.skytube.businessobjects.YouTube.Tasks.GetVideoDescriptionTask;
-import free.rm.skytube.businessobjects.YouTube.VideoStream.StreamMetaData;
+import free.rm.skytube.businessobjects.YouTube.YouTubeTasks;
 import free.rm.skytube.businessobjects.interfaces.GetDesiredStreamListener;
+import free.rm.skytube.databinding.ActivityMainBinding;
 import free.rm.skytube.gui.businessobjects.MainActivityListener;
 import free.rm.skytube.gui.businessobjects.YouTubePlayer;
 import free.rm.skytube.gui.fragments.ChromecastControllerFragment;
 import free.rm.skytube.gui.fragments.ChromecastMiniControllerFragment;
-import free.rm.skytube.gui.fragments.YouTubePlayerV1Fragment;
+import io.reactivex.rxjava3.disposables.CompositeDisposable;
 
 /**
  * Base Activity class that handles all Chromecast-related functionality. Any Activity that needs to use the Cast Icon and
@@ -84,6 +82,8 @@ public abstract class BaseActivity extends AppCompatActivity implements MainActi
 	public static final String ACTION_NOTIFICATION_CLICK = "free.rm.skytube.ACTION_NOTIFICATION_CLICK";
 
 	public static final String PANEL_EXPANDED = "free.rm.skytube.PANEL_EXPANDED";
+
+	private static final String PREF_GPS_POPUP_VIEWED = "BaseActivity.pref_gps_poup_viewed";
 
 	private boolean panelShouldExpand = false;
 
@@ -98,18 +98,16 @@ public abstract class BaseActivity extends AppCompatActivity implements MainActi
 	private Intent externalPlayIntent;
 	private Intent notificationClickIntent;
 
-	@BindView((R.id.sliding_layout))
-	protected SlidingUpPanelLayout slidingLayout;
+    protected ActivityMainBinding binding;
 
-	@Nullable
-	@BindView(R.id.chromecastLoadingSpinner)
-	ProgressBar chromecastLoadingSpinner;
+	private final CompositeDisposable compositeDisposable = new CompositeDisposable();
 
-	private String PREF_GPS_POPUP_VIEWED = "BaseActivity.pref_gps_poup_viewed";
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
+
+        binding = ActivityMainBinding.inflate(getLayoutInflater());
 
         /**
          * Google Play Services is required to set up Chromecast support. If it's not available, display a popup that alerts the user,
@@ -179,6 +177,12 @@ public abstract class BaseActivity extends AppCompatActivity implements MainActi
 	}
 
 	@Override
+	protected void onDestroy() {
+		compositeDisposable.clear();
+		super.onDestroy();
+	}
+
+	@Override
 	protected void onNewIntent(Intent intent) {
 		super.onNewIntent(intent);
 		handleExternalPlayOnChromecast(intent);
@@ -233,7 +237,8 @@ public abstract class BaseActivity extends AppCompatActivity implements MainActi
 					externalPlayIntent = intent;
 				} else {
 					if (connectedToChromecast) {
-						new GetVideoDetailsTask(this, intent, (videoId, video) -> playVideoOnChromecast(video, 0)).executeInParallel();
+						compositeDisposable.add(YouTubeTasks.getVideoDetails(this, intent)
+								.subscribe(video -> playVideoOnChromecast(video, 0)));
 					} else {
 						Intent i = new Intent(this, YouTubePlayerActivity.class);
 						i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_MULTIPLE_TASK);
@@ -347,7 +352,7 @@ public abstract class BaseActivity extends AppCompatActivity implements MainActi
 				if(mCastSession.getRemoteMediaClient().getPlayerState() != MediaStatus.PLAYER_STATE_IDLE) {
 					chromecastMiniControllerFragment.init(mCastSession.getRemoteMediaClient());
 					chromecastControllerFragment.init(mCastSession.getRemoteMediaClient());
-					slidingLayout.addPanelSlideListener(getOnPanelDisplayed((int) mCastSession.getRemoteMediaClient().getApproximateStreamPosition(), (int) mCastSession.getRemoteMediaClient().getStreamDuration()));
+					binding.slidingLayout.addPanelSlideListener(getOnPanelDisplayed((int) mCastSession.getRemoteMediaClient().getApproximateStreamPosition(), (int) mCastSession.getRemoteMediaClient().getStreamDuration()));
 				} else if(externalPlayIntent != null) {
 					// A default Chromecast has been set to handle external intents, and that Chromecast has now been
 					// connected to. Play the video (which is stored in externalPlayIntent).
@@ -408,11 +413,9 @@ public abstract class BaseActivity extends AppCompatActivity implements MainActi
 	}
 
 	protected void onLayoutSet() {
-		ButterKnife.bind(this);
-//		slidingLayout.setTouchEnabled(false);
 		if(chromecastMiniControllerFragment == null)
 			chromecastMiniControllerFragment = (ChromecastMiniControllerFragment)getSupportFragmentManager().findFragmentById(R.id.chromecastMiniControllerFragment);
-		chromecastMiniControllerFragment.setSlidingLayout(slidingLayout);
+		chromecastMiniControllerFragment.setSlidingLayout(binding.slidingLayout);
 
 		if(chromecastControllerFragment == null)
 			chromecastControllerFragment = (ChromecastControllerFragment)getSupportFragmentManager().findFragmentById(R.id.chromecastControllerFragment);
@@ -428,39 +431,35 @@ public abstract class BaseActivity extends AppCompatActivity implements MainActi
 		}
 	}
 
-	/**
-	 * When returning to {@link free.rm.skytube.gui.fragments.MainFragment} from a fragment that uses
-	 * CoordinatorLayout, redraw the Sliding Panel. This fixes an apparent bug in CoordinatorLayout that
-	 * causes the panel to be positioned improperly (the bottom half of the panel ends up below the screen)
-	 */
-	@Override
-	public void redrawPanel() {
-		final LinearLayout chromecastControllersContainer = (LinearLayout)findViewById(R.id.chromecastControllersContainer);
-		if(chromecastControllersContainer != null) {
-			chromecastControllersContainer.post(() -> chromecastControllersContainer.requestLayout());
-		}
-	}
+    /**
+     * When returning to {@link free.rm.skytube.gui.fragments.MainFragment} from a fragment that uses
+     * CoordinatorLayout, redraw the Sliding Panel. This fixes an apparent bug in CoordinatorLayout that
+     * causes the panel to be positioned improperly (the bottom half of the panel ends up below the screen)
+     */
+    @Override
+    public void redrawPanel() {
+        final LinearLayout chromecastControllersContainer = binding.chromecastControllersContainer;
+        chromecastControllersContainer.post(binding.chromecastControllersContainer::requestLayout);
+    }
 
-	private void showPanel() {
-		if(slidingLayout != null) {
-			if(slidingLayout.getPanelState() == SlidingUpPanelLayout.PanelState.EXPANDED || panelShouldExpand) {
-				slidingLayout.setPanelState(SlidingUpPanelLayout.PanelState.EXPANDED);
-				chromecastMiniControllerFragment.setSlidingLayout(slidingLayout);
-			} else {
-				slidingLayout.setPanelState(SlidingUpPanelLayout.PanelState.COLLAPSED);
-			}
-		}
-	}
+    private void showPanel() {
+        final SlidingUpPanelLayout slidingLayout = binding.slidingLayout;
+        if(slidingLayout != null) {
+            if(slidingLayout.getPanelState() == SlidingUpPanelLayout.PanelState.EXPANDED || panelShouldExpand) {
+                slidingLayout.setPanelState(SlidingUpPanelLayout.PanelState.EXPANDED);
+                chromecastMiniControllerFragment.setSlidingLayout(slidingLayout);
+            } else {
+                slidingLayout.setPanelState(SlidingUpPanelLayout.PanelState.COLLAPSED);
+            }
+        }
+    }
 
-	private void hidePanel() {
-		if(slidingLayout != null)
-			slidingLayout.setPanelState(SlidingUpPanelLayout.PanelState.HIDDEN);
-	}
-
-	@Override
-	public void onChannelClick(YouTubeChannel channel) {
-
-	}
+    private void hidePanel() {
+        final SlidingUpPanelLayout slidingLayout = binding.slidingLayout;
+        if(slidingLayout != null) {
+            slidingLayout.setPanelState(SlidingUpPanelLayout.PanelState.HIDDEN);
+        }
+    }
 
 	@Override
 	public void onChannelClick(String channelId) {
@@ -473,57 +472,59 @@ public abstract class BaseActivity extends AppCompatActivity implements MainActi
 	public void playVideoOnChromecast(final YouTubeVideo video, final int position) {
 		showLoadingSpinner();
 		if(video.getDescription() == null) {
-			new GetVideoDescriptionTask(video, description -> {
-				playVideoOnChromecast(video, position);
-			}).executeInParallel();
+			compositeDisposable.add(YouTubeTasks.getVideoDescription(video)
+					.subscribe(description -> playVideoOnChromecast(video, position)));
 		} else {
-			video.getDesiredStream(new GetDesiredStreamListener() {
-				@Override
-				public void onGetDesiredStream(StreamMetaData desiredStream) {
-					if(mCastSession == null)
-						return;
-					Gson gson = new Gson();
-					final RemoteMediaClient remoteMediaClient = mCastSession.getRemoteMediaClient();
-					MediaMetadata metadata = new MediaMetadata(MediaMetadata.MEDIA_TYPE_GENERIC);
-					metadata.putInt(KEY_POSITION, position);
-					metadata.putString(KEY_VIDEO, gson.toJson(video));
+			compositeDisposable.add(
+					YouTubeTasks.getDesiredStream(video, new GetDesiredStreamListener() {
+						@Override
+						public void onGetDesiredStream(StreamInfo desiredStream, YouTubeVideo video) {
+							if(mCastSession == null)
+								return;
+							Gson gson = new Gson();
+							final RemoteMediaClient remoteMediaClient = mCastSession.getRemoteMediaClient();
+							MediaMetadata metadata = new MediaMetadata(MediaMetadata.MEDIA_TYPE_GENERIC);
+							metadata.putInt(KEY_POSITION, position);
+							metadata.putString(KEY_VIDEO, gson.toJson(video));
 
-					metadata.addImage(new WebImage(Uri.parse(video.getThumbnailUrl())));
+							metadata.addImage(new WebImage(Uri.parse(video.getThumbnailUrl())));
 
-					MediaInfo currentPlayingMedia = new MediaInfo.Builder(desiredStream.getUri().toString())
+					StreamSelectionPolicy policy = SkyTubeApp.getSettings().getDesiredVideoResolution(false).withAllowVideoOnly(false);
+					StreamSelectionPolicy.StreamSelection selection = policy.select(desiredStream);
+					MediaInfo currentPlayingMedia = new MediaInfo.Builder(selection.getVideoStreamUri().toString())
 									.setStreamType(MediaInfo.STREAM_TYPE_BUFFERED)
-									.setContentType(desiredStream.getFormat().mimeType)
+									.setContentType(selection.getVideoStream().getFormat().mimeType)
 									.setMetadata(metadata)
 									.build();
 
-					MediaLoadOptions options = new MediaLoadOptions.Builder().setAutoplay(true).setPlayPosition(0).build();
-					remoteMediaClient.load(currentPlayingMedia, options);
-					chromecastMiniControllerFragment.init(remoteMediaClient, currentPlayingMedia, position);
-					chromecastControllerFragment.init(remoteMediaClient, currentPlayingMedia, position);
-					// If the Controller panel isn't visible, setting the progress of the progressbar in the mini controller won't
-					// work until the panel is visible, so do it as soon as the sliding panel is visible. Adding this listener when
-					// the panel is not hidden will lead to a java.util.ConcurrentModificationException the next time a video is
-					// switching from local playback to chromecast, so we should only do this if the panel is hidden.
-					if(slidingLayout.getPanelState() == SlidingUpPanelLayout.PanelState.HIDDEN) {
-						slidingLayout.addPanelSlideListener(getOnPanelDisplayed(position, video.getDurationInSeconds()*1000));
-					}
-				}
+							MediaLoadOptions options = new MediaLoadOptions.Builder().setAutoplay(true).setPlayPosition(0).build();
+							remoteMediaClient.load(currentPlayingMedia, options);
+							chromecastMiniControllerFragment.init(remoteMediaClient, currentPlayingMedia, position);
+							chromecastControllerFragment.init(remoteMediaClient, currentPlayingMedia, position);
+							// If the Controller panel isn't visible, setting the progress of the progressbar in the mini controller won't
+							// work until the panel is visible, so do it as soon as the sliding panel is visible. Adding this listener when
+							// the panel is not hidden will lead to a java.util.ConcurrentModificationException the next time a video is
+							// switching from local playback to chromecast, so we should only do this if the panel is hidden.
+                            final SlidingUpPanelLayout slidingLayout = binding.slidingLayout;
+                            if (slidingLayout.getPanelState() == SlidingUpPanelLayout.PanelState.HIDDEN) {
+                                slidingLayout.addPanelSlideListener(getOnPanelDisplayed(position, video.getDurationInSeconds() * 1000));
+                            }
+						}
 
-				@Override
-				public void onGetDesiredStreamError(String errorMessage) {
-					if (errorMessage != null) {
-						if(chromecastLoadingSpinner != null)
-							chromecastLoadingSpinner.setVisibility(View.GONE);
-						new AlertDialog.Builder(BaseActivity.this)
-										.setMessage(errorMessage)
+						@Override
+						public void onGetDesiredStreamError(Throwable throwable) {
+							if (throwable != null) {
+                                setChromecastLoadingSpinnerVisibility(View.GONE);
+								new AlertDialog.Builder(BaseActivity.this)
+										.setMessage(throwable.getMessage())
 										.setTitle(R.string.error_video_play)
 										.setCancelable(false)
-										.setPositiveButton(R.string.ok, (dialog, which) -> {
-										})
+										.setPositiveButton(R.string.ok, null)
 										.show();
-					}
-				}
-			});
+							}
+						}
+					})
+						.subscribe());
 		}
 	}
 
@@ -541,40 +542,38 @@ public abstract class BaseActivity extends AppCompatActivity implements MainActi
 					chromecastMiniControllerFragment.setProgress(position);
 					chromecastControllerFragment.setDuration(duration);
 					chromecastControllerFragment.setProgress(position);
-					slidingLayout.removePanelSlideListener(this);
+					binding.slidingLayout.removePanelSlideListener(this);
 				}
 			}
 		};
 	}
 
-	/**
-	 * When connected to a Chromecast and a video is clicked, this shows a spinner to indicate
-	 * that the video is being loaded.
-	 */
-	@Override
-	public void showLoadingSpinner() {
-		if(chromecastLoadingSpinner != null)
-			chromecastLoadingSpinner.setVisibility(View.VISIBLE);
-	}
+    /**
+     * When connected to a Chromecast and a video is clicked, this shows a spinner to indicate
+     * that the video is being loaded.
+     */
+    @Override
+    public void showLoadingSpinner() {
+        setChromecastLoadingSpinnerVisibility(View.VISIBLE);
+    }
 
-	/**
-	 * Hide the Chromecast Loading Spinner
-	 */
-	public void hideLoadingSpinner() {
-		if(chromecastLoadingSpinner != null)
-			chromecastLoadingSpinner.setVisibility(View.GONE);
-	}
+    /**
+     * Hide the Chromecast Loading Spinner
+     */
+    public void hideLoadingSpinner() {
+        setChromecastLoadingSpinnerVisibility(View.GONE);
+    }
 
-	/**
-	 * Hide the spinner when play has started, and show the panel that contains the Controller
-	 */
-	@Override
-	public void onPlayStarted() {
-		if(chromecastLoadingSpinner != null)
-			chromecastLoadingSpinner.setVisibility(View.GONE);
-		if(slidingLayout.getPanelState() == SlidingUpPanelLayout.PanelState.HIDDEN)
-			showPanel();
-	}
+    /**
+     * Hide the spinner when play has started, and show the panel that contains the Controller
+     */
+    @Override
+    public void onPlayStarted() {
+        setChromecastLoadingSpinnerVisibility(View.GONE);
+        if(binding.slidingLayout.getPanelState() == SlidingUpPanelLayout.PanelState.HIDDEN) {
+            showPanel();
+        }
+    }
 
 	/**
 	 * Chromecast playback has stopped, so hide the panel.
@@ -593,6 +592,7 @@ public abstract class BaseActivity extends AppCompatActivity implements MainActi
 	 * @return false if the Chromecast Controller is visible and expanded, otherwise true.
 	 */
 	public boolean shouldMinimizeOnBack() {
+		SlidingUpPanelLayout slidingLayout = binding.slidingLayout;
 		if(slidingLayout != null && slidingLayout.getPanelState() == SlidingUpPanelLayout.PanelState.EXPANDED) {
 			slidingLayout.setPanelState(SlidingUpPanelLayout.PanelState.COLLAPSED);
 			return false;
@@ -606,7 +606,7 @@ public abstract class BaseActivity extends AppCompatActivity implements MainActi
 		if(chromecastMiniControllerFragment != null && chromecastControllerFragment != null) {
 			getSupportFragmentManager().putFragment(outState, ChromecastMiniControllerFragment.CHROMECAST_MINI_CONTROLLER_FRAGMENT, chromecastMiniControllerFragment);
 			getSupportFragmentManager().putFragment(outState, ChromecastControllerFragment.CHROMECAST_CONTROLLER_FRAGMENT, chromecastControllerFragment);
-			outState.putBoolean(PANEL_EXPANDED, slidingLayout.getPanelState() == SlidingUpPanelLayout.PanelState.EXPANDED);
+			outState.putBoolean(PANEL_EXPANDED, binding.slidingLayout.getPanelState() == SlidingUpPanelLayout.PanelState.EXPANDED);
 		}
 	}
 
@@ -622,5 +622,9 @@ public abstract class BaseActivity extends AppCompatActivity implements MainActi
 	 */
 	@Override
 	public void refreshSubscriptionsFeedVideos() {}
+
+    protected void setChromecastLoadingSpinnerVisibility(final int visibility) {
+        binding.chromecastLoadingSpinner.setVisibility(visibility);
+    }
 
 }

@@ -19,29 +19,27 @@ package free.rm.skytube.gui.activities;
 
 import android.content.ClipData;
 import android.content.ClipboardManager;
-import android.content.Context;
 import android.content.Intent;
-import android.database.Cursor;
 import android.graphics.Color;
+import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.os.Bundle;
-
-import androidx.annotation.NonNull;
-import androidx.fragment.app.Fragment;
-import androidx.fragment.app.FragmentManager;
-import androidx.fragment.app.FragmentTransaction;
-import androidx.core.content.ContextCompat;
-import androidx.appcompat.app.AlertDialog;
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.appcompat.widget.SearchView;
-
-import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.AutoCompleteTextView;
-import android.widget.EditText;
 import android.widget.FrameLayout;
+
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.content.res.AppCompatResources;
+import androidx.appcompat.widget.SearchView;
+import androidx.core.content.ContextCompat;
+import androidx.core.graphics.drawable.DrawableCompat;
+import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentManager;
+import androidx.fragment.app.FragmentTransaction;
 
 import com.mikepenz.actionitembadge.library.ActionItemBadge;
 import com.mikepenz.actionitembadge.library.utils.BadgeStyle;
@@ -49,9 +47,9 @@ import com.mikepenz.actionitembadge.library.utils.BadgeStyle;
 import java.io.Serializable;
 import java.util.ArrayList;
 
-import butterknife.BindView;
-import butterknife.ButterKnife;
+import free.rm.skytube.BuildConfig;
 import free.rm.skytube.R;
+import free.rm.skytube.app.EventBus;
 import free.rm.skytube.app.SkyTubeApp;
 import free.rm.skytube.businessobjects.Logger;
 import free.rm.skytube.businessobjects.TLSSocketFactory;
@@ -61,6 +59,7 @@ import free.rm.skytube.businessobjects.YouTube.VideoBlocker;
 import free.rm.skytube.businessobjects.db.DownloadedVideosDb;
 import free.rm.skytube.businessobjects.db.SearchHistoryDb;
 import free.rm.skytube.businessobjects.db.SearchHistoryTable;
+import free.rm.skytube.databinding.DialogEnterVideoUrlBinding;
 import free.rm.skytube.gui.businessobjects.BlockedVideosDialog;
 import free.rm.skytube.gui.businessobjects.adapters.SearchHistoryCursorAdapter;
 import free.rm.skytube.gui.businessobjects.fragments.FragmentEx;
@@ -69,7 +68,6 @@ import free.rm.skytube.gui.fragments.ChannelBrowserFragment;
 import free.rm.skytube.gui.fragments.MainFragment;
 import free.rm.skytube.gui.fragments.PlaylistVideosFragment;
 import free.rm.skytube.gui.fragments.SearchVideoGridFragment;
-import free.rm.skytube.gui.fragments.SubscriptionsFeedFragment;
 
 /**
  * Main activity (launcher).  This activity holds {@link free.rm.skytube.gui.fragments.VideosGridFragment}.
@@ -78,19 +76,9 @@ import free.rm.skytube.gui.fragments.SubscriptionsFeedFragment;
  * the Chromecast specific functionality)
  */
 public class MainActivity extends BaseActivity {
-	@BindView(R.id.fragment_container)
-	protected FrameLayout           fragmentContainer;
 
-	private MainFragment            mainFragment;
-	private SearchVideoGridFragment searchVideoGridFragment;
-	private ChannelBrowserFragment  channelBrowserFragment;
 	/** Fragment that shows Videos from a specific Playlist */
-	private PlaylistVideosFragment  playlistVideosFragment;
 	private VideoBlockerPlugin      videoBlockerPlugin;
-
-	private FragmentEx currentFragment;
-
-	private boolean dontAddToBackStack = false;
 
 	/** Set to true of the UpdatesCheckerTask has run; false otherwise. */
 	private static boolean updatesCheckerTaskRan = false;
@@ -104,10 +92,17 @@ public class MainActivity extends BaseActivity {
 	private static final String PLAYLIST_VIDEOS_FRAGMENT = "MainActivity.PlaylistVideosFragment";
 	private static final String VIDEO_BLOCKER_PLUGIN = "MainActivity.VideoBlockerPlugin";
 
+	private static final String MAIN_FRAGMENT_TAG = MAIN_FRAGMENT + ".Tag";
+	private static final String CHANNEL_BROWSER_FRAGMENT_TAG = CHANNEL_BROWSER_FRAGMENT + ".Tag";
+	private static final String PLAYLIST_VIDEOS_FRAGMENT_TAG = PLAYLIST_VIDEOS_FRAGMENT + ".Tag";
+	private static final String SEARCH_FRAGMENT_TAG = SEARCH_FRAGMENT + ".Tag";
+	private static final String[] FRAGMENTS = {MAIN_FRAGMENT, SEARCH_FRAGMENT, CHANNEL_BROWSER_FRAGMENT, PLAYLIST_VIDEOS_FRAGMENT};
+
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
+		Logger.i(this, "AppID: %s - flavor: %s buildType: %s version: %s (%s)", BuildConfig.APPLICATION_ID, BuildConfig.FLAVOR, BuildConfig.BUILD_TYPE, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE);
 
 		// To enable downloading with https on pre-kitkat devices.
 		if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.KITKAT) {
@@ -120,28 +115,20 @@ public class MainActivity extends BaseActivity {
 			updatesCheckerTaskRan = true;
 		}
 
-		SkyTubeApp.setFeedUpdateInterval();
+		EventBus.getInstance().registerMainActivityListener(this);
+
+		SkyTubeApp.setFeedUpdateInterval(SkyTubeApp.getSettings().getFeedUpdaterInterval());
 		// Delete any missing downloaded videos
 		new DownloadedVideosDb.RemoveMissingVideosTask().executeInParallel();
 
-		setContentView(R.layout.activity_main);
+		setContentView(binding.getRoot());
 
 		// The Extra variant needs to initialize some Fragments that are used for Chromecast control. This is done in onLayoutSet of BaseActivity.
 		// The OSS variant has a no-op version of this method, since it doesn't need to do anything else here.
 		onLayoutSet();
 
-		ButterKnife.bind(this);
-
-		if(fragmentContainer != null) {
-			if(savedInstanceState != null) {
-				final FragmentManager supportFragmentManager = getSupportFragmentManager();
-				mainFragment = (MainFragment) supportFragmentManager.getFragment(savedInstanceState, MAIN_FRAGMENT);
-				searchVideoGridFragment = (SearchVideoGridFragment) supportFragmentManager.getFragment(savedInstanceState, SEARCH_FRAGMENT);
-				channelBrowserFragment = (ChannelBrowserFragment) supportFragmentManager.getFragment(savedInstanceState, CHANNEL_BROWSER_FRAGMENT);
-				playlistVideosFragment = (PlaylistVideosFragment) supportFragmentManager.getFragment(savedInstanceState, PLAYLIST_VIDEOS_FRAGMENT);
-			}
+		if(binding.fragmentContainer != null) {
 			handleIntent(getIntent());
-
 		}
 
 		if (savedInstanceState != null) {
@@ -174,19 +161,18 @@ public class MainActivity extends BaseActivity {
 		Logger.i(MainActivity.this, "Action is : " + action);
 		initMainFragment(action);
 		if(ACTION_VIEW_CHANNEL.equals(action)) {
-			dontAddToBackStack = true;
 			YouTubeChannel channel = (YouTubeChannel) intent.getSerializableExtra(ChannelBrowserFragment.CHANNEL_OBJ);
 			Logger.i(MainActivity.this, "Channel found: " + channel);
-			onChannelClick(channel);
+			onChannelClick(channel, false);
 		} else if(ACTION_VIEW_PLAYLIST.equals(action)) {
-			dontAddToBackStack = true;
 			YouTubePlaylist playlist = (YouTubePlaylist) intent.getSerializableExtra(PlaylistVideosFragment.PLAYLIST_OBJ);
 			Logger.i(MainActivity.this, "playlist found: " + playlist);
-			onPlaylistClick(playlist);
+			onPlaylistClick(playlist, false);
 		}
 	}
 
 	private void initMainFragment(String action) {
+		MainFragment mainFragment = getMainFragment();
 		if(mainFragment == null) {
 			Logger.i(MainActivity.this,"initMainFragment called "+action);
 			mainFragment = new MainFragment();
@@ -197,10 +183,10 @@ public class MainActivity extends BaseActivity {
 				args.putBoolean(MainFragment.SHOULD_SELECTED_FEED_TAB, true);
 				mainFragment.setArguments(args);
 			}
-			getSupportFragmentManager().beginTransaction().add(R.id.fragment_container, mainFragment).commit();
-			currentFragment = mainFragment;
+			getSupportFragmentManager().beginTransaction().add(R.id.fragment_container, mainFragment, MAIN_FRAGMENT_TAG).commit();
 		} else {
-			Logger.i(MainActivity.this, "mainFragment already exists, action:"+action+" fragment:"+mainFragment +", manager:"+mainFragment.getFragmentManager() +", support="+getSupportFragmentManager());
+			Logger.i(MainActivity.this, "mainFragment already exists, action:"+action+ " fragment:"
+					+mainFragment +", manager:"+mainFragment.getParentFragmentManager() +", support="+getSupportFragmentManager());
 		}
 	}
 
@@ -209,17 +195,12 @@ public class MainActivity extends BaseActivity {
 		super.onSaveInstanceState(outState);
 
 		final FragmentManager supportFragmentManager = getSupportFragmentManager();
-		if(mainFragment != null) {
-			putFragment(supportFragmentManager, outState, MAIN_FRAGMENT, mainFragment);
-		}
-		if(searchVideoGridFragment != null && searchVideoGridFragment.isVisible()) {
-			putFragment(supportFragmentManager, outState, SEARCH_FRAGMENT, searchVideoGridFragment);
-		}
-		if(channelBrowserFragment != null && channelBrowserFragment.isVisible()) {
-			putFragment(supportFragmentManager, outState, CHANNEL_BROWSER_FRAGMENT, channelBrowserFragment);
-		}
-		if(playlistVideosFragment != null && playlistVideosFragment.isVisible()) {
-			putFragment(supportFragmentManager, outState, PLAYLIST_VIDEOS_FRAGMENT, playlistVideosFragment);
+
+		for (String fragmentName : FRAGMENTS) {
+			Fragment fragment = supportFragmentManager.findFragmentByTag(fragmentName + ".Tag");
+			if (fragment != null && fragment.isVisible()) {
+				putFragment(supportFragmentManager, outState, fragmentName, fragment);
+			}
 		}
 
 		// save the video blocker plugin
@@ -228,8 +209,8 @@ public class MainActivity extends BaseActivity {
 
 	private void putFragment(FragmentManager fragmentManager,  Bundle bundle, @NonNull String key,
 						@NonNull Fragment fragment) {
-		if (fragment.getFragmentManager() != fragmentManager) {
-			Logger.e(MainActivity.this, "Error fragment has a different FragmentManager than expected: Fragment=" + fragment + ", manager=" + fragmentManager + ", Fragment.manager=" + fragment.getFragmentManager() + " for key=" + key);
+		if (fragment.getParentFragmentManager() != fragmentManager) {
+			Logger.e(MainActivity.this, "Error fragment has a different FragmentManager than expected: Fragment=" + fragment + ", manager=" + fragmentManager + ", Fragment.manager=" + fragment.getParentFragmentManager() + " for key=" + key);
 		} else {
 			fragmentManager.putFragment(bundle, key, fragment);
 		}
@@ -241,10 +222,35 @@ public class MainActivity extends BaseActivity {
 
 		// Activity may be destroyed when the devices is rotated, so we need to make sure that the
 		// channel play list is holding a reference to the activity being currently in use...
-		if (channelBrowserFragment != null)
+		ChannelBrowserFragment channelBrowserFragment = getChannelBrowserFragment();
+		if (channelBrowserFragment != null) {
 			channelBrowserFragment.getChannelPlaylistsFragment().setMainActivityListener(this);
+		}
 	}
 
+	private ChannelBrowserFragment getChannelBrowserFragment() {
+		Fragment fragment = getSupportFragmentManager().findFragmentByTag(CHANNEL_BROWSER_FRAGMENT_TAG);
+		if (fragment != null) {
+			if (fragment instanceof ChannelBrowserFragment) {
+				return (ChannelBrowserFragment) fragment;
+			} else {
+				Logger.e(MainActivity.this, "Unexpected fragment: "+fragment);
+			}
+		}
+		return null;
+	}
+
+	private MainFragment getMainFragment() {
+		Fragment fragment = getSupportFragmentManager().findFragmentByTag(MAIN_FRAGMENT_TAG);
+		if (fragment != null) {
+			if (fragment instanceof MainFragment) {
+				return (MainFragment) fragment;
+			} else {
+				Logger.e(MainActivity.this, "Unexpected fragment: "+fragment);
+			}
+		}
+		return null;
+	}
 
 	@Override
 	public boolean onCreateOptionsMenu(final Menu menu) {
@@ -265,57 +271,24 @@ public class MainActivity extends BaseActivity {
 		AutoCompleteTextView autoCompleteTextView = searchView.findViewById(androidx.appcompat.R.id.search_src_text);
 		autoCompleteTextView.setThreshold(0);
 
-		SearchHistoryCursorAdapter searchHistoryCursorAdapter = (SearchHistoryCursorAdapter) searchView.getSuggestionsAdapter();
-		Cursor cursor = SearchHistoryDb.getSearchHistoryDb().getSearchCursor("");
-		if (searchHistoryCursorAdapter == null) {
-			searchHistoryCursorAdapter = new SearchHistoryCursorAdapter(getBaseContext(),
-					R.layout.search_hint,
-					cursor,
-					new String[]{SearchHistoryTable.COL_SEARCH_TEXT},
-					new int[]{android.R.id.text1},
-					0);
-			searchHistoryCursorAdapter.setSearchHistoryClickListener(query -> displaySearchResults(query, searchView));
-			searchView.setSuggestionsAdapter(searchHistoryCursorAdapter);
-		} else {
-			// else just change the cursor...
-			searchHistoryCursorAdapter.changeCursor(cursor);
-		}
-		searchView.setSuggestionsAdapter(searchHistoryCursorAdapter);
+		// ... and change/init the cursor... but not clear the search area, so the user can modify the previous one.
+		getSearchHistoryAdapter(searchView);
 
 		// set the query hints to be equal to the previously searched text
 		searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
 			@Override
 			public boolean onQueryTextChange(final String newText) {
-				Logger.d(MainActivity.this, "on query text change: %s", newText);
-				// if the user does not want to have the search string saved, then skip the below...
-				if (SkyTubeApp.getPreferenceManager().getBoolean(getString(R.string.pref_key_disable_search_history), false)
-						||  newText == null) {
+				if (newText == null) {
 					return false;
 				}
-
-				Cursor cursor = SearchHistoryDb.getSearchHistoryDb().getSearchCursor(newText);
-
-				// if the adapter has not been created, then create it
-				SearchHistoryCursorAdapter searchHistoryCursorAdapter = new SearchHistoryCursorAdapter(getBaseContext(),
-						R.layout.search_hint,
-						cursor,
-						new String[]{SearchHistoryTable.COL_SEARCH_TEXT},
-						new int[]{android.R.id.text1},
-						0);
-				searchHistoryCursorAdapter.setSearchHistoryClickListener(query -> displaySearchResults(query, searchView));
-				searchView.setSuggestionsAdapter(searchHistoryCursorAdapter);
-
-				// update the current search string
-				searchHistoryCursorAdapter.setSearchBarString(newText);
-
 				return true;
 			}
 
 			@Override
 			public boolean onQueryTextSubmit(String query) {
-				if(!SkyTubeApp.getPreferenceManager().getBoolean(SkyTubeApp.getStr(R.string.pref_key_disable_search_history), false)) {
+				if(!SkyTubeApp.getSettings().isDisableSearchHistory()) {
 					// Save this search string into the Search History Database (for Suggestions)
-					SearchHistoryDb.getSearchHistoryDb().insertSearchText(query);
+					SearchHistoryDb.getSearchHistoryDb().insertSearchText(query).subscribe();
 				}
 
 				displaySearchResults(query, searchView);
@@ -327,6 +300,19 @@ public class MainActivity extends BaseActivity {
 		return true;
 	}
 
+    private synchronized SearchHistoryCursorAdapter getSearchHistoryAdapter(final SearchView searchView) {
+        SearchHistoryCursorAdapter searchHistoryCursorAdapter = (SearchHistoryCursorAdapter) searchView.getSuggestionsAdapter();
+        if (searchHistoryCursorAdapter == null) {
+            searchHistoryCursorAdapter = new SearchHistoryCursorAdapter(getBaseContext(),
+                    R.layout.search_hint,
+                    new String[]{SearchHistoryTable.COL_SEARCH_TEXT},
+                    new int[]{android.R.id.text1},
+                    0);
+            searchHistoryCursorAdapter.setSearchHistoryClickListener(query -> displaySearchResults(query, searchView));
+            searchView.setSuggestionsAdapter(searchHistoryCursorAdapter);
+        }
+        return searchHistoryCursorAdapter;
+    }
 
 	@Override
 	public boolean onOptionsItemSelected(MenuItem item) {
@@ -342,6 +328,7 @@ public class MainActivity extends BaseActivity {
 				displayEnterVideoUrlDialog();
 				return true;
 			case android.R.id.home:
+				Fragment mainFragment = getMainFragment();
 				if(mainFragment == null || !mainFragment.isVisible()) {
 					onBackPressed();
 					return true;
@@ -352,52 +339,53 @@ public class MainActivity extends BaseActivity {
 	}
 
 
-	@Override
-	protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-		super.onActivityResult(requestCode, resultCode, data);
-	}
-
-
 	/**
 	 * Display the Enter Video URL dialog.
 	 */
 	private void displayEnterVideoUrlDialog() {
-		final AlertDialog alertDialog = new AlertDialog.Builder(this)
-			.setView(R.layout.dialog_enter_video_url)
-			.setTitle(R.string.enter_video_url)
-			.setPositiveButton(R.string.play, (dialog, which) -> {
-				// get the inputted URL string
-				final String videoUrl = ((EditText)((AlertDialog) dialog).findViewById(R.id.dialog_url_edittext)).getText().toString();
+		final DialogEnterVideoUrlBinding dialogBinding
+				= DialogEnterVideoUrlBinding.inflate(getLayoutInflater());
 
-				// play the video
-				SkyTubeApp.openUrl(MainActivity.this, videoUrl, true);
-			})
-			.setNegativeButton(R.string.cancel, null)
-			.show();
+		new AlertDialog.Builder(this)
+				.setView(dialogBinding.getRoot())
+				.setTitle(R.string.enter_video_url)
+				.setPositiveButton(R.string.play, (dialog, which) -> {
+					// get the inputted URL string
+					final String videoUrl = dialogBinding.dialogUrlEdittext.getText().toString();
+
+					// play the video
+					SkyTubeApp.openUrl(MainActivity.this, videoUrl, true);
+				})
+				.setNegativeButton(R.string.cancel, null)
+				.show();
 
 		// paste whatever there is in the clipboard (hopefully it is a video url)
-		((EditText) alertDialog.findViewById(R.id.dialog_url_edittext)).setText(getClipboardItem());
+		CharSequence charSequence = getClipboardItem();
+		if (charSequence != null) {
+			dialogBinding.dialogUrlEdittext.setText(charSequence.toString());
+		}
 
 		// clear URL edittext button
-		alertDialog.findViewById(R.id.dialog_url_clear_button).setOnClickListener(v -> ((EditText) alertDialog.findViewById(R.id.dialog_url_edittext)).setText(""));
+		dialogBinding.dialogUrlClearButton.setOnClickListener(v ->
+				dialogBinding.dialogUrlEdittext.setText(""));
 	}
 
 
 	/**
 	 * Return the last item stored in the clipboard.
 	 *
-	 * @return	{@link String}
+	 * @return	{@link CharSequence}
 	 */
-	private String getClipboardItem() {
-		String              clipboardText    = "";
-		ClipboardManager    clipboardManager = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+	private CharSequence getClipboardItem() {
+		CharSequence clipboardText = null;
+		ClipboardManager clipboardManager = ContextCompat.getSystemService(this, ClipboardManager.class);
 
 		// if the clipboard contain data ...
 		if (clipboardManager != null  &&  clipboardManager.hasPrimaryClip()) {
 			ClipData.Item item = clipboardManager.getPrimaryClip().getItemAt(0);
 
 			// gets the clipboard as text.
-			clipboardText = item.getText().toString();
+			clipboardText = item.coerceToText(this);
 		}
 
 		return clipboardText;
@@ -418,6 +406,7 @@ public class MainActivity extends BaseActivity {
 	@Override
 	public void onBackPressed() {
 		if(shouldMinimizeOnBack()) {
+			MainFragment mainFragment = getMainFragment();
 			if (mainFragment != null && mainFragment.isVisible()) {
 				// If the Subscriptions Drawer is open, close it instead of minimizing the app.
 				if (mainFragment.isDrawerOpen()) {
@@ -438,51 +427,53 @@ public class MainActivity extends BaseActivity {
 		}
 	}
 
-	private void switchToFragment(FragmentEx fragment) {
-		FragmentTransaction transaction = getSupportFragmentManager().beginTransaction();
+	private void switchToFragment(FragmentEx fragment, boolean addToBackStack, String tag) {
+		FragmentManager manager = getSupportFragmentManager();
+		if (manager.isDestroyed()) {
+			Logger.e(this,"FragmentManager is destroyed, unable to add "+fragment);
+			return;
+		}
+		FragmentTransaction transaction = manager.beginTransaction();
 
-		transaction.replace(R.id.fragment_container, fragment);
-		if(!dontAddToBackStack)
+		transaction.replace(R.id.fragment_container, fragment, tag);
+		if(addToBackStack) {
 			transaction.addToBackStack(null);
-		else
-			dontAddToBackStack = false;
+		}
 		transaction.commit();
-		currentFragment = fragment;
 	}
 
 
-	@Override
-	public void onChannelClick(YouTubeChannel channel) {
+	public void onChannelClick(YouTubeChannel channel, boolean addToBackStack) {
 		Bundle args = new Bundle();
 		args.putSerializable(ChannelBrowserFragment.CHANNEL_OBJ, channel);
-		switchToChannelBrowserFragment(args);
+		switchToChannelBrowserFragment(args, addToBackStack);
 	}
-
 
 	@Override
 	public void onChannelClick(String channelId) {
 		Bundle args = new Bundle();
 		args.putString(ChannelBrowserFragment.CHANNEL_ID, channelId);
-		switchToChannelBrowserFragment(args);
+		switchToChannelBrowserFragment(args, true);
 	}
 
-
-	private void switchToChannelBrowserFragment(Bundle args) {
-		channelBrowserFragment = new ChannelBrowserFragment();
+	private void switchToChannelBrowserFragment(Bundle args, boolean addToBackStack) {
+		ChannelBrowserFragment channelBrowserFragment = new ChannelBrowserFragment();
 		channelBrowserFragment.getChannelPlaylistsFragment().setMainActivityListener(this);
 		channelBrowserFragment.setArguments(args);
-		currentFragment = channelBrowserFragment;
-		switchToFragment(channelBrowserFragment);
+		switchToFragment(channelBrowserFragment, addToBackStack, CHANNEL_BROWSER_FRAGMENT_TAG);
 	}
-
 
 	@Override
 	public void onPlaylistClick(YouTubePlaylist playlist) {
-		playlistVideosFragment = new PlaylistVideosFragment();
+		onPlaylistClick(playlist, true);
+	}
+
+	private void onPlaylistClick(YouTubePlaylist playlist, boolean addToBackStack) {
+		PlaylistVideosFragment playlistVideosFragment = new PlaylistVideosFragment();
 		Bundle args = new Bundle();
 		args.putSerializable(PlaylistVideosFragment.PLAYLIST_OBJ, playlist);
 		playlistVideosFragment.setArguments(args);
-		switchToFragment(playlistVideosFragment);
+		switchToFragment(playlistVideosFragment, addToBackStack, PLAYLIST_VIDEOS_FRAGMENT_TAG);
 	}
 
 
@@ -497,14 +488,12 @@ public class MainActivity extends BaseActivity {
 		searchView.clearFocus();
 
 		// open SearchVideoGridFragment and display the results
-		searchVideoGridFragment = new SearchVideoGridFragment();
+		SearchVideoGridFragment searchVideoGridFragment = new SearchVideoGridFragment();
 		Bundle bundle = new Bundle();
 		bundle.putString(SearchVideoGridFragment.QUERY, query);
 		searchVideoGridFragment.setArguments(bundle);
-		switchToFragment(searchVideoGridFragment);
+		switchToFragment(searchVideoGridFragment, true, SEARCH_FRAGMENT_TAG);
 	}
-
-
 
 	//////////////////////////////////////////////////////////////////////////////////////////
 
@@ -543,21 +532,22 @@ public class MainActivity extends BaseActivity {
 		 * Setup the video blocker notification icon which will be displayed in the tool bar.
  		 */
 		void setupIconForToolBar(final Menu menu) {
+			final Drawable blocker = AppCompatResources.getDrawable(activity, R.drawable.ic_blocker)
+					.mutate();
+			DrawableCompat.setTint(blocker, Color.WHITE);
 			if (getTotalBlockedVideos() > 0) {
 				// display a red bubble containing the number of blocked videos
-				ActionItemBadge.update(activity,
-						menu.findItem(R.id.menu_blocker),
-						ContextCompat.getDrawable(activity, R.drawable.ic_video_blocker),
-						ActionItemBadge.BadgeStyles.RED,
-						getTotalBlockedVideos());
+				ActionItemBadge.update(activity, menu.findItem(R.id.menu_blocker), blocker,
+						ActionItemBadge.BadgeStyles.RED, getTotalBlockedVideos());
 			} else {
 				// Else, set the bubble to transparent.  This is required so that when the user
 				// clicks on the icon, the app will be able to detect such click and displays the
 				// BlockedVideosDialog (otherwise, the ActionItemBadge would just ignore such clicks.
 				ActionItemBadge.update(activity,
-						menu.findItem(R.id.menu_blocker),
-						ContextCompat.getDrawable(activity, R.drawable.ic_video_blocker),
-						new BadgeStyle(BadgeStyle.Style.DEFAULT, com.mikepenz.actionitembadge.library.R.layout.menu_action_item_badge, Color.TRANSPARENT, Color.TRANSPARENT, Color.WHITE),
+						menu.findItem(R.id.menu_blocker), blocker,
+						new BadgeStyle(BadgeStyle.Style.DEFAULT,
+								com.mikepenz.actionitembadge.library.R.layout.menu_action_item_badge,
+								Color.TRANSPARENT, Color.TRANSPARENT, Color.WHITE),
 						"");
 			}
 		}
@@ -590,7 +580,11 @@ public class MainActivity extends BaseActivity {
 	 */
 	@Override
 	public void refreshSubscriptionsFeedVideos() {
-		SubscriptionsFeedFragment.unsetFlag(SubscriptionsFeedFragment.FLAG_REFRESH_FEED_FROM_CACHE);
-		mainFragment.getSubscriptionsFeedFragment().refreshFeedFromCache();
+		SkyTubeApp.getSettings().setRefreshSubsFeedFromCache(false);
+		MainFragment mainFragment = getMainFragment();
+		if (mainFragment != null) {
+			mainFragment.refreshSubscriptionsFeedVideos();
+		}
 	}
+
 }

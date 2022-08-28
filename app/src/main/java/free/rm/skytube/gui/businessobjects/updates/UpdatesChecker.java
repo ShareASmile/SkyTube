@@ -25,9 +25,9 @@ import org.json.JSONObject;
 
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.Objects;
 
 import free.rm.skytube.BuildConfig;
-import free.rm.skytube.app.Utils;
 
 /**
  * Checks for app updates.
@@ -53,21 +53,22 @@ public class UpdatesChecker {
 	 * Check for app updates.  If an update is available, {@link this#latestApkUrl} and {@link this#latestApkVersion}
 	 * will be set.
 	 *
-	 * @return True if if an update is available;  false otherwise.
 	 */
-	public boolean checkForUpdates() {
+	public void checkForUpdates() {
 		updatesAvailable = false;
 		boolean oss = BuildConfig.FLAVOR.equalsIgnoreCase("oss");
+		boolean snapshot = BuildConfig.BUILD_TYPE.equalsIgnoreCase("snapshot");
 
-		if (oss && !fetchReleaseNotes) {
-			// OSS version update checker is the responsibility of FDROID
-			Log.d(TAG, "OSS version - will not be checking for updates.");
+		if ((oss || snapshot) && !fetchReleaseNotes) {
+			if (oss) {
+				// OSS version update checker is the responsibility of FDROID
+				Log.d(TAG, "OSS version - will not be checking for updates.");
+			} else if (snapshot) {
+				Log.d(TAG, "Snapshot version - build by Github - will not be checking for updates.");
+			}
 		} else {
-
-			try {
-				WebStream webStream = new WebStream(BuildConfig.SKYTUBE_UPDATES_URL);
+			try (WebStream webStream = new WebStream(BuildConfig.SKYTUBE_UPDATES_URL)) {
 				String updatesJSONStr = webStream.downloadRemoteTextFile();
-				webStream.close();
 
 				JSONObject json = new JSONObject(updatesJSONStr);
 				latestApkVersion = getLatestVersionNumber(json);
@@ -77,7 +78,7 @@ public class UpdatesChecker {
 				Log.d(TAG, "REMOTE_VER: " + latestApkVersion);
 
 				if (!oss) {
-					if (!Utils.equals(currentVersionNumber, latestApkVersion)) {
+					if (!Objects.equals(currentVersionNumber, latestApkVersion)) {
 						this.latestApkUrl = getLatestApkUrl(json);
 						updatesAvailable = latestApkUrl != null;
 						Log.d(TAG, "Update available.  APK_URL: " + latestApkUrl);
@@ -89,7 +90,6 @@ public class UpdatesChecker {
 				Log.e(TAG, "An error has occurred while checking for updates", e);
 			}
 		}
-		return updatesAvailable;
 	}
 
 
@@ -117,8 +117,7 @@ public class UpdatesChecker {
 	 * @throws JSONException
 	 */
 	private String getLatestVersionNumber(JSONObject json) throws JSONException {
-		String  versionNumberStr = json.getString("tag_name").substring(1);  // tag_name = "v2.0" --> so we are going to delete the 'v' character
-		return versionNumberStr;
+		return json.getString("tag_name").substring(1);
 	}
 
 

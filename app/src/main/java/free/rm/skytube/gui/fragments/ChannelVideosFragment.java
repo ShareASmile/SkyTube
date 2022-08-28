@@ -1,10 +1,12 @@
 package free.rm.skytube.gui.fragments;
 
 import android.os.Bundle;
-import androidx.annotation.Nullable;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import free.rm.skytube.R;
 import free.rm.skytube.app.SkyTubeApp;
@@ -19,50 +21,50 @@ public class ChannelVideosFragment extends VideosGridFragment {
 	/** YouTube Channel */
 	private YouTubeChannel channel;
 
-
 	@Nullable
 	@Override
-	public View onCreateView(LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+	public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
 		// get the channel
-		channel = (YouTubeChannel)getArguments().getSerializable(ChannelBrowserFragment.CHANNEL_OBJ);
+		channel = (YouTubeChannel) requireArguments().getSerializable(ChannelBrowserFragment.CHANNEL_OBJ);
 
 		// create and return the view
 		View view =  super.onCreateView(inflater, container, savedInstanceState);
 
-		if (channel != null)
+		if (channel != null) {
 			videoGridAdapter.setYouTubeChannel(channel);
+		}
 
 		return view;
 	}
 
+    public VideoGridAdapter getVideoGridAdapter() {
+        return videoGridAdapter;
+    }
 
 	public void setYouTubeChannel(YouTubeChannel youTubeChannel) {
 		channel = youTubeChannel;
-		videoGridAdapter.setYouTubeChannel(youTubeChannel);
+		if (videoGridAdapter != null) {
+			videoGridAdapter.setYouTubeChannel(youTubeChannel);
+		}
 	}
-
-
-	public VideoGridAdapter getVideoGridAdapter() {
-		return videoGridAdapter;
-	}
-
 
 	@Override
 	protected VideoCategory getVideoCategory() {
 		return VideoCategory.CHANNEL_VIDEOS;
 	}
 
-
 	@Override
 	protected String getSearchString() {
 		return channel.getId();
 	}
-
 
 	@Override
 	public String getFragmentName() {
 		return SkyTubeApp.getStr(R.string.videos);
 	}
 
-
+	@Override
+	public int getPriority() {
+		return 0;
+	}
 }

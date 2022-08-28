@@ -17,15 +17,17 @@
 
 package free.rm.skytube.gui.fragments.preferences;
 
-import android.app.AlertDialog;
 import android.content.SharedPreferences;
 import android.os.Bundle;
-import android.preference.EditTextPreference;
-import android.preference.ListPreference;
-import android.preference.Preference;
-import android.preference.MultiSelectListPreference;
-import android.preference.PreferenceFragment;
+import android.util.Log;
 import android.widget.Toast;
+
+import androidx.appcompat.app.AlertDialog;
+import androidx.preference.EditTextPreference;
+import androidx.preference.ListPreference;
+import androidx.preference.MultiSelectListPreference;
+import androidx.preference.PreferenceFragmentCompat;
+import androidx.preference.PreferenceManager;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -33,38 +35,36 @@ import java.util.List;
 import java.util.Set;
 
 import free.rm.skytube.R;
+import free.rm.skytube.app.EventBus;
 import free.rm.skytube.app.SkyTubeApp;
 import free.rm.skytube.businessobjects.AsyncTaskParallel;
 import free.rm.skytube.businessobjects.YouTube.POJOs.YouTubeAPIKey;
 import free.rm.skytube.businessobjects.YouTube.ValidateYouTubeAPIKey;
-import free.rm.skytube.gui.businessobjects.adapters.SubsAdapter;
 
 /**
  * Preference fragment for other settings.
  */
-public class OthersPreferenceFragment extends PreferenceFragment implements SharedPreferences.OnSharedPreferenceChangeListener {
-	private Preference folderChooser;
-
+public class OthersPreferenceFragment extends BasePreferenceFragment {
 	ListPreference defaultTabPref;
 
 	@Override
-	public void onCreate(Bundle savedInstanceState) {
-		super.onCreate(savedInstanceState);
+	public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
 		addPreferencesFromResource(R.xml.preference_others);
 
 		// Default tab
-		defaultTabPref = (ListPreference)findPreference(getString(R.string.pref_key_default_tab_name));
+		defaultTabPref = findPreference(getString(R.string.pref_key_default_tab_name));
 		Set<String> hiddenFragments = SkyTubeApp.getPreferenceManager().getStringSet(getString(R.string.pref_key_hide_tabs), new HashSet<>());
-		String[] tabListValues = SkyTubeApp.getStringArray(R.array.tab_list_values);
-		if(hiddenFragments.size() == 0) {
-			defaultTabPref.setEntries(SkyTubeApp.getStringArray(R.array.tab_list));
+		final String[] tabListValues = SkyTubeApp.getStringArray(R.array.tab_list_values);
+		final String[] tabListLabels = SkyTubeApp.getFragmentNames().getAllNames(tabListValues);
+		if(hiddenFragments.isEmpty()) {
+			defaultTabPref.setEntries(tabListLabels);
 			defaultTabPref.setEntryValues(tabListValues);
 		} else {
 			List<String> defaultTabEntries = new ArrayList<>();
 			List<String> defaultTabEntryValues = new ArrayList<>();
-			for(int i=0;i<SkyTubeApp.getStringArray(R.array.tab_list).length;i++) {
+			for(int i = 0; i< tabListValues.length; i++) {
 				if(!hiddenFragments.contains(tabListValues[i])) {
-					defaultTabEntries.add(SkyTubeApp.getStringArray(R.array.tab_list)[i]);
+					defaultTabEntries.add(tabListLabels[i]);
 					defaultTabEntryValues.add(tabListValues[i]);
 
 				}
@@ -77,26 +77,14 @@ public class OthersPreferenceFragment extends PreferenceFragment implements Shar
 		}
 		defaultTabPref.setSummary(String.format(getString(R.string.pref_summary_default_tab), defaultTabPref.getEntry()));
 
-		MultiSelectListPreference hiddenTabsPref = (MultiSelectListPreference)findPreference(getString(R.string.pref_key_hide_tabs));
-		hiddenTabsPref.setEntryValues(tabListValues);
+		MultiSelectListPreference hiddenTabsPref = findPreference(getString(R.string.pref_key_hide_tabs));
+		hiddenTabsPref.setEntries(tabListLabels);
 
 //		ListPreference feedNotificationPref = (ListPreference) findPreference(getString(R.string.pref_feed_notification_key));
 //		if(feedNotificationPref.getValue() == null) {
 //			feedNotificationPref.setValueIndex(0);
 //		}
 //		feedNotificationPref.setSummary(String.format(getString(R.string.pref_summary_feed_notification), feedNotificationPref.getEntry()));
-	}
-
-	@Override
-	public void onResume() {
-		super.onResume();
-		getPreferenceManager().getSharedPreferences().registerOnSharedPreferenceChangeListener(this);
-	}
-
-	@Override
-	public void onPause() {
-		super.onPause();
-		getPreferenceManager().getSharedPreferences().unregisterOnSharedPreferenceChangeListener(this);
 	}
 
 	@Override
@@ -107,7 +95,10 @@ public class OthersPreferenceFragment extends PreferenceFragment implements Shar
 				ListPreference defaultTabPref = (ListPreference) findPreference(key);
 				defaultTabPref.setSummary(String.format(getString(R.string.pref_summary_default_tab), defaultTabPref.getEntry()));
 			} else if (key.equals(getString(R.string.pref_key_hide_tabs))) {
-				displayRestartDialog(R.string.pref_hide_tabs_restart, true);
+				//
+				EventBus.getInstance().notifyMainTabChanged(EventBus.SettingChange.HIDE_TABS);
+
+				// displayRestartDialog(R.string.pref_hide_tabs_restart, true);
 			} else if (key.equals(getString(R.string.pref_youtube_api_key))) {
 				// Validate the entered API Key when saved (and not empty), with a simple call to get the most popular video
 				EditTextPreference    youtubeAPIKeyPref = (EditTextPreference) findPreference(getString(R.string.pref_youtube_api_key));
@@ -127,9 +118,8 @@ public class OthersPreferenceFragment extends PreferenceFragment implements Shar
 					}
 				}
 			} else if (key.equals(getString(R.string.pref_key_subscriptions_alphabetical_order))) {
-				SubsAdapter subsAdapter = SubsAdapter.get(getActivity());
-				subsAdapter.refreshSubsList();
-			}/*else if (key.equals(getString(R.string.pref_feed_notification_key))) {
+				EventBus.getInstance().notifyMainTabChanged(EventBus.SettingChange.SUBSCRIPTION_LIST_CHANGED);
+			} /*else if (key.equals(getString(R.string.pref_feed_notification_key))) {
 				ListPreference feedNotificationPref = (ListPreference) findPreference(key);
 				feedNotificationPref.setSummary(String.format(getString(R.string.pref_summary_feed_notification), feedNotificationPref.getEntry()));
 
@@ -147,13 +137,13 @@ public class OthersPreferenceFragment extends PreferenceFragment implements Shar
 	 * @param messageID Message resource ID.
 	 */
 	private void displayRestartDialog(int messageID, boolean restart) {
-		AlertDialog.Builder b = new AlertDialog.Builder(getActivity())
+		final AlertDialog.Builder b = new AlertDialog.Builder(getActivity())
 				.setMessage(messageID)
 				.setCancelable(false);
 		if (restart) {
 			b.setPositiveButton(R.string.restart, (dialog, which) -> SkyTubeApp.restartApp());
 		} else {
-			b.setPositiveButton(R.string.ok, (dialog, which) -> {});
+			b.setPositiveButton(R.string.ok, null);
 		}
 		b.show();
 	}

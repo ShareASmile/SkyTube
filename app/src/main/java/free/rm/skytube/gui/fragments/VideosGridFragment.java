@@ -17,19 +17,21 @@
 
 package free.rm.skytube.gui.fragments;
 
+import android.content.Context;
 import android.os.Bundle;
-import androidx.recyclerview.widget.GridLayoutManager;
-import androidx.recyclerview.widget.RecyclerView;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.GridView;
 
+import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.GridLayoutManager;
+
 import com.bumptech.glide.Glide;
 
-import butterknife.BindView;
 import free.rm.skytube.R;
 import free.rm.skytube.businessobjects.VideoCategory;
+import free.rm.skytube.databinding.VideosGridviewBinding;
 import free.rm.skytube.gui.businessobjects.MainActivityListener;
 import free.rm.skytube.gui.businessobjects.adapters.VideoGridAdapter;
 import free.rm.skytube.gui.businessobjects.fragments.BaseVideosGridFragment;
@@ -38,60 +40,53 @@ import free.rm.skytube.gui.businessobjects.fragments.BaseVideosGridFragment;
  * A fragment that will hold a {@link GridView} full of YouTube videos.
  */
 public abstract class VideosGridFragment extends BaseVideosGridFragment {
+    protected VideosGridviewBinding gridviewBinding;
 
-	@BindView(R.id.grid_view)
-	protected RecyclerView	gridView;
+    public VideosGridFragment() {
+    }
 
-	public VideosGridFragment() {
-		super(new VideoGridAdapter(null));
-	}
-	public VideosGridFragment(VideoGridAdapter videoGrid) {
-		super(videoGrid);
-	}
+    @Override
+    public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
+        // inflate the layout for this fragment, and initialize
+        initVideos(container.getContext(), videoGridAdapter, VideosGridviewBinding.inflate(inflater, container, false));
 
-	@Override
-	public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
-		// inflate the layout for this fragment
-		View view = super.onCreateView(inflater, container, savedInstanceState);
+        return gridviewBinding.getRoot();
+    }
 
-		// setup the video grid view
-		videoGridAdapter.setSwipeRefreshLayout(swipeRefreshLayout);
+    protected void initVideos(@NonNull Context context, VideoGridAdapter videoGridAdapterParam, @NonNull VideosGridviewBinding gridviewBindingParam) {
+        initBase(context, videoGridAdapterParam, gridviewBindingParam.swipeRefreshLayout);
+        this.gridviewBinding = gridviewBindingParam;
+        // setup the video grid view
+        videoGridAdapter.setSwipeRefreshLayout(swipeRefreshLayout);
 
-		if (getVideoCategory() != null)
-			videoGridAdapter.setVideoCategory(getVideoCategory(), getSearchString());
+        VideoCategory category = getVideoCategory();
+        if (category != null)
+            videoGridAdapter.setVideoCategory(category, getSearchString());
 
-		videoGridAdapter.setListener((MainActivityListener)getActivity());
+        videoGridAdapter.setListener((MainActivityListener)getActivity());
 
-		gridView.setHasFixedSize(true);
-		gridView.setLayoutManager(new GridLayoutManager(getActivity(), getResources().getInteger(R.integer.video_grid_num_columns)));
-		gridView.setAdapter(videoGridAdapter);
-
-		// The fragment is already selected, we need to initialize the video grid
-		if (this.isFragmentSelected()) {
-			videoGridAdapter.initializeList();
-		}
-		return view;
-	}
-
+        gridviewBinding.gridView.setHasFixedSize(true);
+        gridviewBinding.gridView.setLayoutManager(new GridLayoutManager(getActivity(),
+                getResources().getInteger(R.integer.video_grid_num_columns)));
+        gridviewBinding.gridView.setAdapter(videoGridAdapter);
+    }
 
 	@Override
-	public void onDestroy() {
-		super.onDestroy();
-		Glide.get(getActivity()).clearMemory();
+	public void onDestroyView() {
+		gridviewBinding.gridView.setAdapter(null);
+		gridviewBinding = null;
+		super.onDestroyView();
+		Glide.get(requireContext()).clearMemory();
 	}
 
-
-	@Override
-	protected int getLayoutResource() {
-		return R.layout.videos_gridview;
-	}
-
+    void scrollToTop() {
+        gridviewBinding.gridView.smoothScrollToPosition(0);
+    }
 
 	/**
 	 * @return Returns the category of videos being displayed by this fragment.
 	 */
 	protected abstract VideoCategory getVideoCategory();
-
 
 	/**
 	 * @return Returns the search string used when setting the video category.  (Can be used to
@@ -106,4 +101,9 @@ public abstract class VideosGridFragment extends BaseVideosGridFragment {
 	 */
 	public abstract String getFragmentName();
 
+	public abstract int getPriority();
+
+	public String getBundleKey() {
+		return null;
+	}
 }

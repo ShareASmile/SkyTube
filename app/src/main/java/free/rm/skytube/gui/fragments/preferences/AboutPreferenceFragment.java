@@ -17,38 +17,35 @@
 
 package free.rm.skytube.gui.fragments.preferences;
 
-import android.app.AlertDialog;
 import android.app.ProgressDialog;
+import android.content.Context;
 import android.content.Intent;
-import android.content.pm.ApplicationInfo;
 import android.net.Uri;
 import android.os.Bundle;
-import android.preference.Preference;
-import android.preference.PreferenceFragment;
 import android.util.Log;
 import android.webkit.WebChromeClient;
 import android.webkit.WebView;
 
-import java.io.File;
+import androidx.appcompat.app.AlertDialog;
+import androidx.preference.Preference;
+import androidx.preference.PreferenceFragmentCompat;
+
 import java.text.SimpleDateFormat;
 import java.util.Locale;
 
 import free.rm.skytube.BuildConfig;
 import free.rm.skytube.R;
-import free.rm.skytube.app.SkyTubeApp;
 import free.rm.skytube.gui.businessobjects.SkyTubeMaterialDialog;
 import free.rm.skytube.gui.businessobjects.updates.UpdatesCheckerTask;
 
 /**
  * Preference fragment for about (this app) related settings.
  */
-public class AboutPreferenceFragment extends PreferenceFragment {
-
+public class AboutPreferenceFragment extends PreferenceFragmentCompat {
 	private static final String TAG = AboutPreferenceFragment.class.getSimpleName();
 
 	@Override
-	public void onCreate(Bundle savedInstanceState) {
-		super.onCreate(savedInstanceState);
+	public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
 		addPreferencesFromResource(R.xml.preference_about);
 
 		// set the app's version number
@@ -57,7 +54,7 @@ public class AboutPreferenceFragment extends PreferenceFragment {
 
 		// check for updates option
 		Preference updatesPref = findPreference(getString(R.string.pref_key_updates));
-		if (BuildConfig.FLAVOR.equalsIgnoreCase("oss")) {
+		if (BuildConfig.FLAVOR.equalsIgnoreCase("oss") || BuildConfig.BUILD_TYPE.equalsIgnoreCase("snapshot")) {
 			// remove the updates option if the user is running the OSS flavor...
 			getPreferenceScreen().removePreference(updatesPref);
 		} else {
@@ -90,8 +87,13 @@ public class AboutPreferenceFragment extends PreferenceFragment {
 			displayAppLicense();
 			return true;
 		});
-	}
 
+		Preference openIssuePref = findPreference(getString(R.string.pref_key_open_issue));
+		openIssuePref.setOnPreferenceClickListener(preference -> {
+			startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/SkyTubeTeam/SkyTube/issues/new/choose")));
+			return true;
+		});
+	}
 
 	/**
 	 * @return The app's version number.
@@ -103,6 +105,10 @@ public class AboutPreferenceFragment extends PreferenceFragment {
 			ver.append(" Extra");
 		}
 
+		if (BuildConfig.BUILD_TYPE.equalsIgnoreCase("snapshot")) {
+			ver.append(" Snapshot");
+		}
+
 		if (BuildConfig.DEBUG) {
 			ver.append(" (Debug ").append(getAppBuildTimeStamp()).append(')');
 		} else {
@@ -111,8 +117,6 @@ public class AboutPreferenceFragment extends PreferenceFragment {
 
 		return ver.toString();
 	}
-
-
 
 	/**
 	 * @return App's build timestamp.
@@ -128,23 +132,21 @@ public class AboutPreferenceFragment extends PreferenceFragment {
 		}
 
 		return timeStamp;
-
 	}
-
-
 
 	/**
 	 * Displays the credits (i.e. contributors).
 	 */
 	private void displayCredits() {
-		final WebView webView = new WebView(getActivity());
+		Context context = getContext();
+		final WebView webView = new WebView(context);
 		webView.setWebChromeClient(new WebChromeClient() {
 			ProgressDialog progressDialog;
 
 			@Override
 			public void onProgressChanged(WebView view, int progress) {
 				if (progressDialog == null) {
-					progressDialog = new ProgressDialog(getActivity());
+					progressDialog = new ProgressDialog(context);
 					progressDialog.show();
 					progressDialog.setMessage(getString(R.string.loading));
 				}
@@ -164,8 +166,6 @@ public class AboutPreferenceFragment extends PreferenceFragment {
 				.show();
 	}
 
-
-
 	/**
 	 * Displays the app's license in an AlertDialog.
 	 */
@@ -176,5 +176,4 @@ public class AboutPreferenceFragment extends PreferenceFragment {
 				.setCancelable(false)	// do not allow the user to click outside the dialog or press the back button
 				.show();
 	}
-
 }

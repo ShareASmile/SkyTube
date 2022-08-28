@@ -18,30 +18,27 @@
 package free.rm.skytube.gui.businessobjects;
 
 import android.app.Activity;
-import android.app.AlertDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Handler;
-import android.preference.PreferenceManager;
 import android.util.Log;
+
+import androidx.appcompat.app.AlertDialog;
+import androidx.preference.PreferenceManager;
 
 import free.rm.skytube.R;
 import free.rm.skytube.app.SkyTubeApp;
 import free.rm.skytube.businessobjects.ChromecastListener;
-import free.rm.skytube.businessobjects.GetVideoDetailsTask;
 import free.rm.skytube.businessobjects.YouTube.POJOs.YouTubeAPIKey;
-import free.rm.skytube.businessobjects.YouTube.POJOs.YouTubeChannel;
-import free.rm.skytube.businessobjects.YouTube.POJOs.YouTubePlaylist;
 import free.rm.skytube.businessobjects.YouTube.POJOs.YouTubeVideo;
+import free.rm.skytube.businessobjects.YouTube.YouTubeTasks;
 import free.rm.skytube.businessobjects.YouTube.newpipe.ContentId;
 import free.rm.skytube.businessobjects.db.PlaybackStatusDb;
 import free.rm.skytube.gui.activities.BaseActivity;
-import free.rm.skytube.gui.activities.MainActivity;
 import free.rm.skytube.gui.activities.YouTubePlayerActivity;
-import free.rm.skytube.gui.fragments.ChannelBrowserFragment;
-import free.rm.skytube.gui.fragments.PlaylistVideosFragment;
+import io.reactivex.rxjava3.disposables.Disposable;
 
 import static free.rm.skytube.gui.activities.YouTubePlayerActivity.YOUTUBE_VIDEO_OBJ;
 
@@ -91,9 +88,10 @@ public class YouTubePlayer {
 	 *
 	 * @param videoId ContentId of the video to be watched.
 	 */
-	public static void launch(ContentId videoId, final Context context) {
-		if(connectingToChromecast || connectedToChromecast) {
-			new GetVideoDetailsTask(context, videoId, (videoUrl1, video) -> launchOnChromecast(video, context)).executeInParallel();
+	public static Disposable launch(ContentId videoId, final Context context) {
+		if (connectingToChromecast || connectedToChromecast) {
+			return YouTubeTasks.getVideoDetails(context, videoId)
+					.subscribe(video -> launchOnChromecast(video, context));
 		} else {
 			// if the user has selected to play the videos using the official YouTube player
 			// (in the preferences/settings) ...
@@ -102,6 +100,7 @@ public class YouTubePlayer {
 			} else {
 				launchCustomYouTubePlayer(videoId, context);
 			}
+			return Disposable.empty();
 		}
 	}
 
@@ -114,7 +113,7 @@ public class YouTubePlayer {
 		} else {
 			if (context instanceof ChromecastListener) {
 				final PlaybackStatusDb.VideoWatchedStatus status = PlaybackStatusDb.getPlaybackStatusDb().getVideoWatchedStatus(youTubeVideo.getId());
-				if(!SkyTubeApp.getPreferenceManager().getBoolean(context.getString(R.string.pref_key_disable_playback_status), false) && status.getPosition() > 0) {
+				if(SkyTubeApp.getSettings().isPlaybackStatusEnabled() && status.getPosition() > 0) {
 					new AlertDialog.Builder(context)
 									.setTitle(R.string.should_resume)
 									.setPositiveButton(R.string.yes, (dialog, which) -> {
@@ -162,7 +161,7 @@ public class YouTubePlayer {
 			new AlertDialog.Builder(context)
 					.setTitle(R.string.error)
 					.setMessage(errorMsg)
-					.setIcon(android.R.drawable.ic_dialog_alert)
+					.setIcon(R.drawable.ic_warning)
 					.setNeutralButton(android.R.string.ok, null)
 					.show();
 		}

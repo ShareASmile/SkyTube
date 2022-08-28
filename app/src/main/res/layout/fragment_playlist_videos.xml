@@ -25,8 +25,8 @@
 				android:adjustViewBounds="true"
 				android:scaleType="fitXY"
 				android:src="@drawable/banner_default"
-				android:tint="#14000000"
-				custom:defaultImage="@drawable/banner_default"/>
+				app:tint="#14000000"
+				custom:defaultImage="@drawable/banner_default" />
 
 			<LinearLayout
 				android:layout_width="match_parent"
@@ -58,12 +58,14 @@
 					<!-- PLAYLIST TITLE -->
 					<TextView
 						android:id="@+id/playlist_title_text_view"
-						android:layout_toRightOf="@+id/playlist_thumbnail_image_view"
+						style="@style/PlaylistTitleTextView"
 						android:layout_centerVertical="true"
+						android:layout_toEndOf="@+id/playlist_thumbnail_image_view"
+						android:layout_toRightOf="@+id/playlist_thumbnail_image_view"
 						android:gravity="center_vertical"
-						android:drawableLeft="@drawable/ic_playlists"
 						android:text="Playlist Title"
-						style="@style/PlaylistTitleTextView"/>
+						app:drawableLeftCompat="@drawable/ic_playlists"
+						app:drawableStartCompat="@drawable/ic_playlists" />
 
 				</RelativeLayout>
 
@@ -71,10 +73,11 @@
 		</FrameLayout>
 	</com.google.android.material.appbar.AppBarLayout>
 
-
 	<include
+		android:id="@+id/videos_gridview"
 		layout="@layout/videos_gridview"
 		android:layout_width="match_parent"
 		android:layout_height="wrap_content"
 		app:layout_behavior="@string/appbar_scrolling_view_behavior"/>
+
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
