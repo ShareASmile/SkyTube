@@ -18,7 +18,10 @@
 package free.rm.skytube.gui.businessobjects.updates;
 
 import android.content.Context;
+
 import androidx.appcompat.app.AlertDialog;
+
+import java.util.Objects;
 
 import free.rm.skytube.BuildConfig;
 import free.rm.skytube.R;
@@ -55,7 +58,7 @@ public class UpdatesCheckerTask extends AsyncTaskParallel<Void, Void, UpdatesChe
 	protected UpdatesChecker doInBackground(Void... params) {
 		currentVersionNumber = getCurrentVerNumber();
 		String displayedReleaseNotesVersion = SkyTubeApp.getSettings().getDisplayedReleaseNoteTag();
-		showReleaseNotes = !Utils.equals(currentVersionNumber, displayedReleaseNotesVersion) && !displayUpToDateMessage;
+		showReleaseNotes = !Objects.equals(currentVersionNumber, displayedReleaseNotesVersion) && !displayUpToDateMessage;
 		Logger.d(this, "Current Version Number: %s, last displayed: %s, show release notes: %s", currentVersionNumber, displayedReleaseNotesVersion, showReleaseNotes);
 		UpdatesChecker updatesChecker = new UpdatesChecker(showReleaseNotes, currentVersionNumber);
 		updatesChecker.checkForUpdates();
@@ -84,9 +87,8 @@ public class UpdatesCheckerTask extends AsyncTaskParallel<Void, Void, UpdatesChe
 			new AlertDialog.Builder(context)
 					.setTitle(String.format(context.getString(R.string.release_notes), updatesChecker.getLatestApkVersion()))
 					.setMessage(updatesChecker.getReleaseNotes())
-					.setNeutralButton(R.string.ok, (dialog,button) -> {
-						SkyTubeApp.getSettings().setDisplayedReleaseNoteTag(currentVersionNumber);
-					})
+					.setNeutralButton(R.string.ok, (dialog,button) ->
+							SkyTubeApp.getSettings().setDisplayedReleaseNoteTag(currentVersionNumber))
 					.show();
 		}
 	}

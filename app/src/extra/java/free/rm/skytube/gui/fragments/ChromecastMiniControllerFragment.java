@@ -9,10 +9,8 @@ import android.view.ViewGroup;
 import android.view.animation.Animation;
 import android.view.animation.LinearInterpolator;
 import android.view.animation.RotateAnimation;
-import android.widget.ImageButton;
-import android.widget.ImageView;
-import android.widget.TextView;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.google.android.gms.cast.MediaInfo;
@@ -20,13 +18,13 @@ import com.google.android.gms.cast.MediaStatus;
 import com.google.android.gms.cast.framework.media.RemoteMediaClient;
 import com.sothree.slidinguppanel.SlidingUpPanelLayout;
 
-import butterknife.BindView;
-import butterknife.ButterKnife;
-import butterknife.OnClick;
 import free.rm.skytube.R;
+import free.rm.skytube.app.Settings;
 import free.rm.skytube.app.SkyTubeApp;
 import free.rm.skytube.businessobjects.ChromecastListener;
 import free.rm.skytube.businessobjects.db.PlaybackStatusDb;
+import io.reactivex.rxjava3.disposables.CompositeDisposable;
+import free.rm.skytube.databinding.FragmentChromecastMiniControllerBinding;
 
 /**
  * Fragment class that is used for Chromecast control. This Fragment will appear at the bottom of the app when a video
@@ -39,57 +37,56 @@ public class ChromecastMiniControllerFragment extends ChromecastBaseControllerFr
 	/** The {@link free.rm.skytube.businessobjects.ChromecastListener} Activity that will be notified when play has started and stopped */
 	private ChromecastListener activityListener;
 
-	@BindView(R.id.videoTitle)
-	TextView videoTitle;
-	@BindView(R.id.channelName)
-	TextView channelName;
-
-	@BindView(R.id.chromecastMiniControllerChevron)
-	ImageView chromecastMiniControllerChevron;
-
-	@BindView(R.id.chromecastMiniControllerShareButton)
-	ImageButton chromecastMiniControllerShareButton;
-
-	@BindView(R.id.chromecastMiniControllerLeftContainer)
-	View chromecastMiniControllerLeftContainer;
-	@BindView(R.id.chromecastMiniControllerRightContainer)
-	View chromecastMiniControllerRightContainer;
+	private FragmentChromecastMiniControllerBinding binding;
 
 	private SlidingUpPanelLayout slidingLayout;
 
 	private boolean didClickNotification = false;
+	protected final CompositeDisposable compositeDisposable = new CompositeDisposable();
 
 	@Nullable
 	@Override
-	public View onCreateView(LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-		View view = inflater.inflate(R.layout.fragment_chromecast_mini_controller, container);
-		ButterKnife.bind(this, view);
-		return view;
+	public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
+							 @Nullable Bundle savedInstanceState) {
+		binding = FragmentChromecastMiniControllerBinding.inflate(inflater, container, false);
+		chromecastPlaybackProgressBar = binding.chromecastPlaybackProgressBar;
+		playButton = binding.playButton;
+		pauseButton = binding.pauseButton;
+		forwardButton = binding.forwardButton;
+		rewindButton = binding.rewindButton;
+		stopButton = binding.stopButton;
+		bufferingSpinner = binding.bufferingSpinner;
+
+		binding.chromecastMiniControllerShareButton.setOnClickListener(v -> {
+			Intent intent = new Intent(android.content.Intent.ACTION_SEND);
+			intent.setType("text/plain");
+			intent.putExtra(android.content.Intent.EXTRA_TEXT, video.getVideoUrl());
+			startActivity(Intent.createChooser(intent, "Share via"));
+		});
+		return binding.getRoot();
+	}
+
+	@Override
+	public void onDestroyView() {
+		binding = null;
+		super.onDestroyView();
 	}
 
 	@Override
 	public void init(RemoteMediaClient client, MediaInfo media, int position) {
 		super.init(client, media, position);
 
-		videoTitle.setText(video.getTitle());
-		channelName.setText(video.getChannelName());
+		binding.videoTitle.setText(video.getTitle());
+		binding.channelName.setText(video.getChannelName());
 
 		// We just either started playback of a video, or resumed the cast session. In the latter case, if there's a video playing, let the activity
 		// know so that the panel will appear.
 		if(currentPlayerState != MediaStatus.PLAYER_STATE_IDLE) {
 			activityListener.onPlayStarted();
 		}
-		chromecastMiniControllerLeftContainer.setAlpha(1);
-		chromecastMiniControllerRightContainer.setAlpha(1);
+		binding.chromecastMiniControllerLeftContainer.setAlpha(1);
+		binding.chromecastMiniControllerRightContainer.setAlpha(1);
 		setDuration((int)client.getStreamDuration());
-	}
-
-	@OnClick(R.id.chromecastMiniControllerShareButton)
-	public void shareVideo(View v) {
-		Intent intent = new Intent(android.content.Intent.ACTION_SEND);
-		intent.setType("text/plain");
-		intent.putExtra(android.content.Intent.EXTRA_TEXT, video.getVideoUrl());
-		startActivity(Intent.createChooser(intent, "Share via"));
 	}
 
 	@Override
@@ -104,9 +101,8 @@ public class ChromecastMiniControllerFragment extends ChromecastBaseControllerFr
 
 	@Override
 	protected void onPlayStopped() {
-		if(!SkyTubeApp.getPreferenceManager().getBoolean(getString(R.string.pref_key_disable_playback_status), false)) {
-			PlaybackStatusDb.getPlaybackStatusDb().setVideoPosition(video, chromecastPlaybackProgressBar.getProgress());
-		}
+		compositeDisposable.add(
+				PlaybackStatusDb.getPlaybackStatusDb().setVideoPositionInBackground(video, chromecastPlaybackProgressBar.getProgress()));
 
 		activityListener.onPlayStopped();
 	}
@@ -117,7 +113,7 @@ public class ChromecastMiniControllerFragment extends ChromecastBaseControllerFr
 	}
 
 	@Override
-	public void onAttach(Context context) {
+	public void onAttach(@NonNull Context context) {
 		super.onAttach(context);
 		try {
 			activityListener = (ChromecastListener)context;
@@ -126,20 +122,15 @@ public class ChromecastMiniControllerFragment extends ChromecastBaseControllerFr
 		}
 	}
 
-	public ImageView getChromecastMiniControllerChevron() {
-		return chromecastMiniControllerChevron;
-	}
-
-
 	public void setSlidingLayout(SlidingUpPanelLayout layout) {
 		slidingLayout = layout;
 		slidingLayout.addPanelSlideListener(panelSlideListener);
 		if(slidingLayout.getPanelState() == SlidingUpPanelLayout.PanelState.EXPANDED) {
-			chromecastPlaybackProgressBar.setVisibility(View.INVISIBLE);
-			chromecastMiniControllerShareButton.setVisibility(View.VISIBLE);
+			binding.chromecastPlaybackProgressBar.setVisibility(View.INVISIBLE);
+			binding.chromecastMiniControllerShareButton.setVisibility(View.VISIBLE);
 
-			chromecastMiniControllerLeftContainer.setAlpha(0);
-			chromecastMiniControllerRightContainer.setAlpha(0);
+			binding.chromecastMiniControllerLeftContainer.setAlpha(0);
+			binding.chromecastMiniControllerRightContainer.setAlpha(0);
 		}
 	}
 
@@ -151,10 +142,10 @@ public class ChromecastMiniControllerFragment extends ChromecastBaseControllerFr
 			// slide offset goes from 0.00xxx to 1.0000 as it is slides from the bottom all the way to the top
 			// Fade the buttons in (for sliding down) and out (for sliding up)
 			if(slideOffset > 0) {
-				chromecastMiniControllerLeftContainer.setAlpha(1 - slideOffset);
-				chromecastMiniControllerRightContainer.setAlpha(1 - slideOffset);
+				binding.chromecastMiniControllerLeftContainer.setAlpha(1 - slideOffset);
+				binding.chromecastMiniControllerRightContainer.setAlpha(1 - slideOffset);
 				if (slideOffset < 1)
-					chromecastMiniControllerShareButton.setVisibility(View.INVISIBLE);
+					binding.chromecastMiniControllerShareButton.setVisibility(View.INVISIBLE);
 			}
 		}
 
@@ -167,20 +158,22 @@ public class ChromecastMiniControllerFragment extends ChromecastBaseControllerFr
 
 			// Hide the mini controller progress bar when the panel is expanded, and show it when it's collapsed
 			if(newState == SlidingUpPanelLayout.PanelState.EXPANDED) {
-				chromecastPlaybackProgressBar.setVisibility(View.INVISIBLE);
-				chromecastMiniControllerShareButton.setVisibility(View.VISIBLE);
+				binding.chromecastPlaybackProgressBar.setVisibility(View.INVISIBLE);
+				binding.chromecastMiniControllerShareButton.setVisibility(View.VISIBLE);
 
-				chromecastMiniControllerLeftContainer.setAlpha(0);
-				chromecastMiniControllerRightContainer.setAlpha(0);
+				binding.chromecastMiniControllerLeftContainer.setAlpha(0);
+				binding.chromecastMiniControllerRightContainer.setAlpha(0);
 			} else if(newState == SlidingUpPanelLayout.PanelState.COLLAPSED) {
-				chromecastPlaybackProgressBar.setVisibility(View.VISIBLE);
+				binding.chromecastPlaybackProgressBar.setVisibility(View.VISIBLE);
 
 				// If the user subscribed to or unsubscribed from the Channel this video belongs to, from the ChromecastController, when the panel collapses, we should
 				// update the Feed tab to reflect the change.
-				if(SubscriptionsFeedFragment.isFlagSet(SubscriptionsFeedFragment.FLAG_REFRESH_FEED_FROM_CACHE)) {
-					SubscriptionsFeedFragment.unsetFlag(SubscriptionsFeedFragment.FLAG_REFRESH_FEED_FROM_CACHE);
-					if(mainActivityListener != null)
+				Settings settings = SkyTubeApp.getSettings();
+				if(settings.isRefreshSubsFeedFromCache()) {
+					settings.setRefreshSubsFeedFromCache(false);
+					if(mainActivityListener != null) {
 						mainActivityListener.refreshSubscriptionsFeedVideos();
+					}
 				}
 			}
 
@@ -201,7 +194,7 @@ public class ChromecastMiniControllerFragment extends ChromecastBaseControllerFr
 				anim.setInterpolator(new LinearInterpolator());
 				anim.setDuration(500);
 				anim.setFillAfter(true);
-				getChromecastMiniControllerChevron().startAnimation(anim);
+				binding.chromecastMiniControllerChevron.startAnimation(anim);
 			}
 
 			// Since we're now at collapsed, set wasHidden to false to show the animation the next time the state changes.

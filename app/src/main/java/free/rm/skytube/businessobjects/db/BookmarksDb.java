@@ -22,6 +22,7 @@ import android.content.Context;
 import android.database.Cursor;
 import android.database.SQLException;
 import android.database.sqlite.SQLiteDatabase;
+import android.view.Menu;
 
 import androidx.annotation.NonNull;
 import androidx.core.util.Pair;
@@ -32,29 +33,33 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import free.rm.skytube.app.SkyTubeApp;
 import free.rm.skytube.app.Utils;
+import free.rm.skytube.app.utils.WeakList;
 import free.rm.skytube.businessobjects.Logger;
 import free.rm.skytube.businessobjects.YouTube.POJOs.CardData;
 import free.rm.skytube.businessobjects.YouTube.POJOs.YouTubeChannel;
 import free.rm.skytube.businessobjects.YouTube.POJOs.YouTubeVideo;
 import free.rm.skytube.businessobjects.YouTube.newpipe.VideoId;
+import free.rm.skytube.businessobjects.interfaces.CardListener;
 import free.rm.skytube.businessobjects.interfaces.OrderableDatabase;
+import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
+import io.reactivex.rxjava3.core.Single;
+import io.reactivex.rxjava3.disposables.Disposable;
+import io.reactivex.rxjava3.schedulers.Schedulers;
 
 /**
  * A database (DB) that stores user's bookmarked videos.
  */
-public class BookmarksDb extends SQLiteOpenHelperEx implements OrderableDatabase {
+public class BookmarksDb extends CardEventEmitterDatabase implements OrderableDatabase {
 	private static volatile BookmarksDb bookmarksDb = null;
-	private static boolean hasUpdated = false;
 
 	private static final int DATABASE_VERSION = 1;
 	private static final String DATABASE_NAME = "bookmarks.db";
-
-	private List<BookmarksDbListener> listeners = new ArrayList<>();
-
 
 	private BookmarksDb(Context context) {
 		super(context, DATABASE_NAME, null, DATABASE_VERSION);
@@ -69,12 +74,6 @@ public class BookmarksDb extends SQLiteOpenHelperEx implements OrderableDatabase
 		return bookmarksDb;
 	}
 
-
-	@Override
-	protected void clearDatabaseInstance() {
-		bookmarksDb = null;
-	}
-
 	@Override
 	public void onCreate(SQLiteDatabase db) {
 		db.execSQL(BookmarksTable.getCreateStatement());
@@ -85,17 +84,28 @@ public class BookmarksDb extends SQLiteOpenHelperEx implements OrderableDatabase
 	public void onUpgrade(SQLiteDatabase sqLiteDatabase, int oldVersion, int newVersion) {
 	}
 
-
 	/**
-	 * Add the specified video to the list of bookmarked videos. The video will appear at the
-	 * top of the list (when displayed in the grid, videos will be ordered by the Order
-	 * field, descending.
-	 *
-	 * @param video Video to add
-	 *
-	 * @return True if the video was successfully saved/bookmarked to the DB.
+	 * A task that checks if this video is bookmarked or not. If it is bookmarked, then it will hide
+	 * the menu option to bookmark the video; otherwise it will hide the option to unbookmark the
+	 * video.
 	 */
-	public DatabaseResult add(YouTubeVideo video) {
+	public Single<Boolean> isVideoBookmarked(@NonNull String videoId) {
+		return Single.fromCallable(() -> isBookmarked(videoId))
+				.subscribeOn(Schedulers.io())
+				.observeOn(AndroidSchedulers.mainThread());
+	}
+
+
+        /**
+         * Add the specified video to the list of bookmarked videos. The video will appear at the
+         * top of the list (when displayed in the grid, videos will be ordered by the Order
+         * field, descending.
+         *
+         * @param video Video to add
+         *
+         * @return True if the video was successfully saved/bookmarked to the DB.
+         */
+    private DatabaseResult add(YouTubeVideo video) {
 		Gson gson = new Gson();
 		ContentValues values = new ContentValues();
 		values.put(BookmarksTable.COL_YOUTUBE_VIDEO_ID, video.getId());
@@ -109,7 +119,6 @@ public class BookmarksDb extends SQLiteOpenHelperEx implements OrderableDatabase
 			long result = getWritableDatabase().insertWithOnConflict(BookmarksTable.TABLE_NAME, null, values, SQLiteDatabase.CONFLICT_IGNORE);
 			Logger.i(this, "Result for adding "+ video+ " IS "+ result);
 			if (result >= 1) {
-				onBookmarkAdded(video);
 				return DatabaseResult.SUCCESS;
 			}
 			if (isBookmarked(video.getId())) {
@@ -123,6 +132,28 @@ public class BookmarksDb extends SQLiteOpenHelperEx implements OrderableDatabase
 		}
 	}
 
+    public Single<DatabaseResult> bookmarkAsync(YouTubeVideo video) {
+        return Single.fromSupplier(() -> add(video))
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .doOnSuccess(status -> {
+                    if (status == DatabaseResult.SUCCESS) {
+                        notifyCardAdded(video);
+                    }
+                });
+    }
+
+    public Single<DatabaseResult> unbookmarkAsync(VideoId video) {
+        return Single.fromSupplier(() -> remove(video))
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .doOnSuccess(status -> {
+                    if (status == DatabaseResult.SUCCESS) {
+                        notifyCardDeleted(video);
+                    }
+                });
+    }
+
 	/**
 	 * Remove the specified video from the list of bookmarked videos.
 	 *
@@ -130,7 +161,7 @@ public class BookmarksDb extends SQLiteOpenHelperEx implements OrderableDatabase
 	 *
 	 * @return True if the video has been unbookmarked; false otherwise.
 	 */
-	public DatabaseResult remove(VideoId video) {
+	private DatabaseResult remove(VideoId video) {
 		try {
 			int rowsDeleted = getWritableDatabase().delete(BookmarksTable.TABLE_NAME,
 					BookmarksTable.COL_YOUTUBE_VIDEO_ID + " = ?",
@@ -159,7 +190,6 @@ public class BookmarksDb extends SQLiteOpenHelperEx implements OrderableDatabase
 
 				cursor.close();
 
-				onBookmarkDeleted(video);
 				return DatabaseResult.SUCCESS;
 			}
 				return DatabaseResult.NOT_MODIFIED;
@@ -188,7 +218,6 @@ public class BookmarksDb extends SQLiteOpenHelperEx implements OrderableDatabase
 		}
 	}
 
-
 	/**
 	 * Check if the specified Video has been bookmarked.
 	 *
@@ -197,47 +226,23 @@ public class BookmarksDb extends SQLiteOpenHelperEx implements OrderableDatabase
 	 * @return True if it has been bookmarked, false if not.
 	 */
 	public boolean isBookmarked(String videoId) {
-		Cursor cursor = getReadableDatabase().query(
-						BookmarksTable.TABLE_NAME,
-						new String[]{BookmarksTable.COL_YOUTUBE_VIDEO_ID},
-						BookmarksTable.COL_YOUTUBE_VIDEO_ID + " = ?",
-						new String[]{videoId}, null, null, null);
-		boolean	hasVideo = cursor.moveToNext();
-
-		cursor.close();
-		return hasVideo;
+		return executeQueryForInteger(BookmarksTable.IS_BOOKMARKED_QUERY, new String[]{videoId}, 0) > 0;
 	}
 
-
-	/**
-	 * @return The total number of bookmarked videos.
-	 */
-	public int getTotalBookmarks() {
-		String	query = String.format("SELECT COUNT(*) FROM %s", BookmarksTable.TABLE_NAME);
-		Cursor	cursor = BookmarksDb.getBookmarksDb().getReadableDatabase().rawQuery(query, null);
-		int		totalBookmarks = 0;
-
-		if (cursor.moveToFirst()) {
-			totalBookmarks = cursor.getInt(0);
-		}
-
-		cursor.close();
-		return totalBookmarks;
-	}
+    /**
+     * @return The total number of bookmarked videos.
+     */
+    public Single<Integer> getTotalBookmarkCount() {
+        return Single.fromCallable(() ->
+            executeQueryForInteger(BookmarksTable.COUNT_ALL_BOOKMARKS, 0)
+        ).subscribeOn(Schedulers.io());
+    }
 
 	/**
 	 * @return The maximum of the order number - which could be different from the number of bookmarked videos, in case some of them are deleted.
 	 */
 	public int getMaximumOrderNumber() {
-		Cursor	cursor = getReadableDatabase().rawQuery(BookmarksTable.MAXIMUM_ORDER_QUERY, null);
-		int		maxBookmarkOrder = 0;
-
-		if (cursor.moveToFirst()) {
-			maxBookmarkOrder = cursor.getInt(0);
-		}
-
-		cursor.close();
-		return maxBookmarkOrder;
+		return executeQueryForInteger(BookmarksTable.MAXIMUM_ORDER_QUERY, 0);
 	}
 
 
@@ -299,62 +304,6 @@ public class BookmarksDb extends SQLiteOpenHelperEx implements OrderableDatabase
 
 		cursor.close();
 		return Pair.create(videos, minOrder);
-	}
-
-
-	/**
-	 * Add a Listener that will be notified when a Video is added or removed from Bookmarked Videos. This will
-	 * allow the Video Grid to be redrawn in order to remove the video from display.
-	 *
-	 * @param listener The Listener (which implements BookmarksDbListener) to add.
-	 */
-	public void addListener(BookmarksDbListener listener) {
-		if(!listeners.contains(listener))
-			listeners.add(listener);
-	}
-
-
-	/**
-	 * Called when the Bookmarks DB is updated by a bookmark insertion.
-	 */
-	private void onBookmarkAdded(YouTubeVideo video) {
-		for (BookmarksDbListener listener : listeners) {
-			listener.onBookmarkAdded(video);
-		}
-	}
-
-	/**
-	 * Called when the Bookmarks DB is updated by deletion.
-	 */
-	private void onBookmarkDeleted(VideoId video) {
-		for (BookmarksDbListener listener : listeners) {
-			listener.onBookmarkDeleted(video);
-		}
-	}
-
-	public static boolean isHasUpdated() {
-		return hasUpdated;
-	}
-
-	public static void setHasUpdated(boolean hasUpdated) {
-		BookmarksDb.hasUpdated = hasUpdated;
-	}
-
-
-
-	////////////////////////////////////////////////////////////////////////////////////////////////
-
-
-	public interface BookmarksDbListener {
-		/**
-		 * Will be called once the bookmarks DB is updated - by a bookmark insertion.
-		 */
-		void onBookmarkAdded(YouTubeVideo video);
-
-		/**
-		 * Will be called once the bookmarks DB is updated - by a bookmark deletion.
-		 */
-		void onBookmarkDeleted(VideoId videoId);
 	}
 
 }

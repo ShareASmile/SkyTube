@@ -18,23 +18,28 @@
 package free.rm.skytube.gui.businessobjects.adapters;
 
 import android.content.Context;
-import androidx.recyclerview.widget.RecyclerView;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ImageView;
-import android.widget.TextView;
+
+import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.RecyclerView;
 
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.request.RequestOptions;
 
+import java.util.HashSet;
 import java.util.Iterator;
+import java.util.Set;
 
 import free.rm.skytube.R;
+import free.rm.skytube.app.EventBus;
 import free.rm.skytube.businessobjects.YouTube.POJOs.ChannelView;
-import free.rm.skytube.businessobjects.db.Tasks.GetSubscribedChannelViewTask;
+import free.rm.skytube.businessobjects.db.DatabaseTasks;
+import free.rm.skytube.databinding.SubChannelBinding;
 import free.rm.skytube.gui.businessobjects.MainActivityListener;
+import io.reactivex.rxjava3.disposables.CompositeDisposable;
 
 /**
  * Channel subscriptions adapter: Contains a list of channels (that the user subscribed to) together
@@ -43,33 +48,16 @@ import free.rm.skytube.gui.businessobjects.MainActivityListener;
 public class SubsAdapter extends RecyclerViewAdapterEx<ChannelView, SubsAdapter.SubChannelViewHolder> {
 
 	private static final String TAG = SubsAdapter.class.getSimpleName();
-	private static SubsAdapter subsAdapter = null;
-	private MainActivityListener listener;
 
 	private String searchText;
 
-	private SubsAdapter(Context context, View progressBar) {
+	private final CompositeDisposable compositeDisposable = new CompositeDisposable();
+
+	public SubsAdapter(Context context, View progressBar) {
 		super(context);
 
 		// populate this adapter with user's subscribed channels
 		executeQuery(null, progressBar);
-
-	}
-
-	public static SubsAdapter get(Context context) {
-		return get(context, null);
-	}
-
-	public static SubsAdapter get(Context context, View progressBar) {
-		if (subsAdapter == null) {
-			subsAdapter = new SubsAdapter(context, progressBar);
-		}
-
-		return subsAdapter;
-	}
-
-	public void setListener(MainActivityListener listener) {
-		this.listener = listener;
 	}
 
 	/**
@@ -127,9 +115,11 @@ public class SubsAdapter extends RecyclerViewAdapterEx<ChannelView, SubsAdapter.
 	}
 
 	@Override
-	public SubChannelViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
-		View v = LayoutInflater.from(parent.getContext()).inflate(R.layout.sub_channel, parent, false);
-		return new SubChannelViewHolder(v);
+	@NonNull
+	public SubChannelViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+		SubChannelBinding binding = SubChannelBinding.inflate(LayoutInflater.from(parent.getContext()),
+				parent, false);
+		return new SubChannelViewHolder(binding);
 	}
 
 	@Override
@@ -137,6 +127,9 @@ public class SubsAdapter extends RecyclerViewAdapterEx<ChannelView, SubsAdapter.
 		viewHolder.updateInfo(get(position));
 	}
 
+	/**
+	 * This should be called only from MainFragment
+	 */
 	public void refreshSubsList() {
 		clearList();
 		executeQuery(searchText, null);
@@ -148,9 +141,8 @@ public class SubsAdapter extends RecyclerViewAdapterEx<ChannelView, SubsAdapter.
 	}
 
 	private void executeQuery(String searchText, View progressBar) {
-		new GetSubscribedChannelViewTask(searchText, progressBar, channelViews -> {
-			appendList(channelViews);
-		}).executeInParallel();
+		compositeDisposable.add(DatabaseTasks.getSubscribedChannelView(progressBar, searchText)
+				.subscribe(this::appendList));
 	}
 
 	public void filterSubSearch(String searchText){
@@ -161,36 +153,29 @@ public class SubsAdapter extends RecyclerViewAdapterEx<ChannelView, SubsAdapter.
 	////////////////////////////////////////////////////////////////////////////////////////////////
 
 	class SubChannelViewHolder extends RecyclerView.ViewHolder {
+		private final SubChannelBinding binding;
+		private ChannelView channel;
 
-		private ImageView thumbnailImageView;
-		private TextView channelNameTextView;
-		private View newVideosNotificationView;
-		private ChannelView channel = null;
-
-		SubChannelViewHolder(View rowView) {
-			super(rowView);
-			thumbnailImageView = rowView.findViewById(R.id.sub_channel_thumbnail_image_view);
-			channelNameTextView = rowView.findViewById(R.id.sub_channel_name_text_view);
-			newVideosNotificationView = rowView.findViewById(R.id.sub_channel_new_videos_notification);
-			channel = null;
-
-			rowView.setOnClickListener(v -> {
-				if (listener instanceof MainActivityListener)
-					listener.onChannelClick(channel.getId());
+		SubChannelViewHolder(SubChannelBinding binding) {
+			super(binding.getRoot());
+			this.binding = binding;
+			binding.getRoot().setOnClickListener(v -> {
+				String channelId = channel.getId();
+				EventBus.getInstance().notifyMainActivities(listener -> {
+					listener.onChannelClick(channelId);
+				});
 			});
 		}
 
 		void updateInfo(ChannelView channel) {
-			Glide.with(getContext().getApplicationContext())
+			Glide.with(itemView.getContext().getApplicationContext())
 					.load(channel.getThumbnailUrl())
 					.apply(new RequestOptions().placeholder(R.drawable.channel_thumbnail_default))
-					.into(thumbnailImageView);
+					.into(binding.subChannelThumbnailImageView);
 
-			channelNameTextView.setText(channel.getTitle());
-			newVideosNotificationView.setVisibility(channel.isNewVideosSinceLastVisit() ? View.VISIBLE : View.INVISIBLE);
+			binding.subChannelNameTextView.setText(channel.getTitle());
+			binding.subChannelNewVideosNotification.setVisibility(channel.isNewVideosSinceLastVisit() ? View.VISIBLE : View.INVISIBLE);
 			this.channel = channel;
 		}
-
 	}
-
 }

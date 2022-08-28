@@ -27,11 +27,12 @@ import android.net.Uri;
 import android.os.Environment;
 import android.webkit.MimeTypeMap;
 
+import androidx.core.content.ContextCompat;
+
 import java.io.File;
 import java.io.Serializable;
 import java.util.regex.Pattern;
 
-import free.rm.skytube.R;
 import free.rm.skytube.app.SkyTubeApp;
 import free.rm.skytube.gui.activities.PermissionsActivity;
 
@@ -53,7 +54,7 @@ public abstract class FileDownloader implements Serializable, PermissionsActivit
 	/** Output file name (without file extension). */
 	private String  outputFileName = null;
 	private String  outputDirectoryName = null;
-	private String  parentDirectory = null;
+	private File  parentDirectory = null;
 	private String  outputFileExtension = null;
 	/** If set to true, then the download manager will download the file over cellular network. */
 	private Boolean allowedOverRoaming = null;
@@ -89,7 +90,7 @@ public abstract class FileDownloader implements Serializable, PermissionsActivit
 	 *
 	 * <p>Android's DownloadManager will be used to download the image on our behalf.</p>
 	 */
-	public void download() {
+	private void download() {
 		// check if the mandatory variables were set -- if not halt the program.
 		checkIfVariablesWereSet();
 
@@ -101,7 +102,7 @@ public abstract class FileDownloader implements Serializable, PermissionsActivit
 
 		Uri     remoteFileUri = Uri.parse(remoteFileUrl);
 		String  downloadFileName = getCompleteFileName(remoteFileUri);
-		FileInformation fileInformation = new FileInformation(downloadFileName);
+		FileInformation fileInformation = new FileInformation(downloadFileName, parentDirectory, dirType);
 		String fullDownloadFileName = fileInformation.getFullDownloadFileName();
 		final File downloadDestinationFile = fileInformation.getFile();
 
@@ -118,7 +119,7 @@ public abstract class FileDownloader implements Serializable, PermissionsActivit
 				.setDescription(description)
 				.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
 
-		String videoDir = SkyTubeApp.getPreferenceManager().getString(SkyTubeApp.getStr(R.string.pref_key_video_download_folder), null);
+		String videoDir = SkyTubeApp.getSettings().getDownloadFolder(null);
 		if(videoDir != null) {
 			request.setDestinationUri(Uri.fromFile(new File(videoDir, fullDownloadFileName)));
 		} else {
@@ -132,9 +133,14 @@ public abstract class FileDownloader implements Serializable, PermissionsActivit
 		// onComplete.onReceive() will be executed once the file is downloaded
 		getContext().registerReceiver(onComplete, new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE));
 
-		// start downloading
-		downloadId = getDownloadManager().enqueue(request);
-		onFileDownloadStarted();
+        // start downloading
+        try {
+            downloadId = ContextCompat.getSystemService(getContext(), DownloadManager.class).enqueue(request);
+            onFileDownloadStarted();
+        } catch (RuntimeException re) {
+            Logger.e(this, "Download failed:"+re.getMessage(), re);
+            onDownloadStartFailed(title, re);
+        }
 	}
 
 
@@ -144,7 +150,7 @@ public abstract class FileDownloader implements Serializable, PermissionsActivit
 	private void checkIfVariablesWereSet() {
 		if (remoteFileUrl == null  ||  dirType == null  ||  title == null
 				||  outputFileName == null  ||  allowedOverRoaming == null
-				|| (allowedOverRoaming == false  &&  allowedNetworkTypesFlags == null)) {
+				|| (!allowedOverRoaming &&  allowedNetworkTypesFlags == null)) {
 			throw new IllegalStateException("One of the parameters was not set for the FileDownloader");
 		}
 
@@ -190,8 +196,9 @@ public abstract class FileDownloader implements Serializable, PermissionsActivit
 	 */
 	private void fileDownloadStatus() {
 		boolean downloadSuccessful = false;
-		Uri     downloadedFileUri  = null;
-		Cursor  cursor = getDownloadManager().query(new DownloadManager.Query().setFilterById(downloadId));
+		Uri downloadedFileUri  = null;
+		Cursor cursor = ContextCompat.getSystemService(getContext(), DownloadManager.class)
+				.query(new DownloadManager.Query().setFilterById(downloadId));
 
 		if (cursor != null  &&  cursor.moveToFirst()) {
 			final int columnIndex = cursor.getColumnIndex(DownloadManager.COLUMN_STATUS);
@@ -269,7 +276,7 @@ public abstract class FileDownloader implements Serializable, PermissionsActivit
 	 *
 	 * @param parentDirectory    E.g. "/storage/emulated/0/videos"
 	 */
-	public FileDownloader setParentDirectory(String parentDirectory) {
+	public FileDownloader setParentDirectory(File parentDirectory) {
 		this.parentDirectory = parentDirectory;
 		return this;
 	}
@@ -298,11 +305,6 @@ public abstract class FileDownloader implements Serializable, PermissionsActivit
 		return this;
 	}
 
-	private DownloadManager getDownloadManager() {
-		return (DownloadManager) getContext().getSystemService(Context.DOWNLOAD_SERVICE);
-	}
-
-
 	////////////////////////////////////////////////////////////////////////////////////////////////
 
 	/**
@@ -310,6 +312,10 @@ public abstract class FileDownloader implements Serializable, PermissionsActivit
 	 */
 	public abstract void onFileDownloadStarted();
 
+    /**
+     * Method called when starting the download failed.
+     */
+    public abstract void onDownloadStartFailed(String downloadName, RuntimeException runtimeException);
 
 	/**
 	 * Method called when the Android's DownloadManager has finished working on the given remote
@@ -331,10 +337,12 @@ public abstract class FileDownloader implements Serializable, PermissionsActivit
 		private final String fullDownloadFileName;
 		private final File file;
 
-		public FileInformation(String downloadFileName) {
+		public FileInformation(String downloadFileName,
+				File parentDirectory, String dirType) {
 			// if there's already a local file for this video for some reason, then do not redownload the
 			// file and halt
-			File parentDir = parentDirectory != null ? new File(parentDirectory) : Environment.getExternalStoragePublicDirectory(dirType);
+			final File externalStorageDir = Environment.getExternalStoragePublicDirectory(dirType);
+			File parentDir = parentDirectory != null ? parentDirectory : externalStorageDir;
 			boolean toDirectories = SkyTubeApp.getSettings().isDownloadToSeparateFolders();
 
 			if (toDirectories && outputDirectoryName != null && !outputDirectoryName.isEmpty()) {

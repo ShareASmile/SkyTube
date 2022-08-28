@@ -17,34 +17,39 @@
 
 package free.rm.skytube.gui.businessobjects.adapters;
 
-import android.content.Context;
-import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
-import android.util.Log;
 import android.view.LayoutInflater;
-import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
+
 import java.io.IOException;
+import java.util.Objects;
 
 import free.rm.skytube.R;
+import free.rm.skytube.businessobjects.Logger;
 import free.rm.skytube.businessobjects.VideoCategory;
 import free.rm.skytube.businessobjects.YouTube.GetYouTubeVideos;
 import free.rm.skytube.businessobjects.YouTube.POJOs.CardData;
 import free.rm.skytube.businessobjects.YouTube.POJOs.YouTubeChannel;
-import free.rm.skytube.businessobjects.YouTube.POJOs.YouTubeVideo;
-import free.rm.skytube.businessobjects.YouTube.Tasks.GetYouTubeVideosTask;
+import free.rm.skytube.businessobjects.YouTube.YouTubeTasks;
+import free.rm.skytube.businessobjects.YouTube.newpipe.ContentId;
 import free.rm.skytube.businessobjects.db.PlaybackStatusDb;
+import free.rm.skytube.businessobjects.interfaces.CardListener;
 import free.rm.skytube.businessobjects.interfaces.VideoPlayStatusUpdateListener;
+import free.rm.skytube.databinding.VideoCellBinding;
 import free.rm.skytube.gui.businessobjects.MainActivityListener;
+import io.reactivex.rxjava3.disposables.CompositeDisposable;
 
 /**
  * An adapter that will display videos in a {@link android.widget.GridView}.
  */
-public class VideoGridAdapter extends RecyclerViewAdapterEx<CardData, GridViewHolder> implements VideoPlayStatusUpdateListener {
+public class VideoGridAdapter extends RecyclerViewAdapterEx<CardData, GridViewHolder> implements VideoPlayStatusUpdateListener, CardListener {
+	private static final String TAG = VideoGridAdapter.class.getSimpleName();
 
 	public interface Callback {
-		void onVideoGridUpdated(int newVideoListSize);
+		void onVideoGridUpdated(boolean hasItems);
 	}
 
 	/**
@@ -77,27 +82,48 @@ public class VideoGridAdapter extends RecyclerViewAdapterEx<CardData, GridViewHo
 
 	/** Set to true if the video adapter is initialized. */
 	private boolean initialized = false;
+    private boolean refreshHappens = false;
 
 	private VideoGridAdapter.Callback videoGridUpdated;
 
-	private static final String TAG = VideoGridAdapter.class.getSimpleName();
-
+	private final CompositeDisposable compositeDisposable = new CompositeDisposable();
 
 	/**
 	 * Constructor.
-	 *
-	 * @param context	Context.
 	 */
-	public VideoGridAdapter(Context context) {
-		super(context);
+	public VideoGridAdapter() {
+		super();
 		this.getYouTubeVideos = null;
 		PlaybackStatusDb.getPlaybackStatusDb().addListener(this);
+	}
+
+	public void onDestroy() {
+		compositeDisposable.clear();
+		PlaybackStatusDb.getPlaybackStatusDb().removeListener(this);
+		this.listener = null;
+		this.videoGridUpdated = null;
 	}
 
 
 	public void setListener(MainActivityListener listener) {
 		this.listener = listener;
 	}
+
+    /**
+     * Will be called once the DB is updated - by a video insertion.
+     */
+    @Override
+    public void onCardAdded(final CardData card) {
+        prepend(card);
+    }
+
+    /**
+     * Will be called once the DB is updated - by a video deletion.
+     */
+    @Override
+    public void onCardDeleted(final ContentId contentId) {
+        remove(card -> contentId.getId().equals(card.getId()));
+    }
 
 	/**
 	 * Set the video category.  Upon set, the adapter will download the videos of the specified
@@ -124,7 +150,7 @@ public class VideoGridAdapter extends RecyclerViewAdapterEx<CardData, GridViewHo
 			return;
 
 		try {
-			Log.i(TAG, videoCategory.toString());
+			Logger.d(this, "setVideoCategory:" + videoCategory.toString());
 
 			// do not show channel name if the video category == CHANNEL_VIDEOS or PLAYLIST_VIDEOS
 			this.showChannelInfo = !(videoCategory == VideoCategory.CHANNEL_VIDEOS  ||  videoCategory == VideoCategory.PLAYLIST_VIDEOS);
@@ -142,7 +168,7 @@ public class VideoGridAdapter extends RecyclerViewAdapterEx<CardData, GridViewHo
 			this.currentVideoCategory = videoCategory;
 
 		} catch (IOException e) {
-			Log.e(TAG, "Could not init " + videoCategory, e);
+			Logger.e(this, "Could not init " + videoCategory, e);
 			Toast.makeText(getContext(),
 							String.format(getContext().getString(R.string.could_not_get_videos), videoCategory.toString()),
 							Toast.LENGTH_LONG).show();
@@ -153,9 +179,10 @@ public class VideoGridAdapter extends RecyclerViewAdapterEx<CardData, GridViewHo
 
 	@Override
 	public GridViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
-		View v = LayoutInflater.from(parent.getContext()).inflate(R.layout.video_cell, parent, false);
-		final GridViewHolder gridViewHolder = new GridViewHolder(v, listener, showChannelInfo);
-		return gridViewHolder;
+		setContext(parent.getContext());
+		final VideoCellBinding binding = VideoCellBinding.inflate(LayoutInflater.from(getContext()),
+				parent, false);
+		return new GridViewHolder(binding, listener, showChannelInfo);
 	}
 
 	/**
@@ -182,33 +209,47 @@ public class VideoGridAdapter extends RecyclerViewAdapterEx<CardData, GridViewHo
 	 * @param clearVideosList If set to true, it will clear out any previously loaded videos (found
 	 *                        in this adapter).
 	 */
-	public void refresh(boolean clearVideosList) {
-		if (getYouTubeVideos != null) {
+	public synchronized void refresh(boolean clearVideosList) {
+		if (getYouTubeVideos != null && !refreshHappens) {
+			refreshHappens = true;
 			if (clearVideosList) {
 				getYouTubeVideos.reset();
 			}
 			// now, we consider this as initialized - sometimes 'refresh' can be called before the initializeList is called.
 			initialized = true;
-			new GetYouTubeVideosTask(getYouTubeVideos, this, swipeRefreshLayout, clearVideosList, videoGridUpdated).executeInParallel();
+
+			compositeDisposable.add(YouTubeTasks.getYouTubeVideos(getYouTubeVideos, this,
+					swipeRefreshLayout, clearVideosList).subscribe());
 		}
 	}
 
-
 	@Override
-	public void onBindViewHolder(GridViewHolder viewHolder, int position) {
-		if (viewHolder != null) {
-			viewHolder.updateInfo(get(position), getContext(), listener);
-		}
+	public void onBindViewHolder(@NonNull GridViewHolder viewHolder, int position) {
+		viewHolder.updateInfo(get(position), getContext(), listener);
 
 		// if it reached the bottom of the list, then try to get the next page of videos
 		if (position >= getItemCount() - 1) {
-			Log.w(TAG, "BOTTOM REACHED!!!");
-			if(getYouTubeVideos != null)
-				new GetYouTubeVideosTask(getYouTubeVideos, this, swipeRefreshLayout, false, videoGridUpdated).executeInParallel();
+			Logger.d(this, "BOTTOM REACHED!!!");
+			if(getYouTubeVideos != null) {
+				refreshHappens = true;
+				compositeDisposable.add(YouTubeTasks.getYouTubeVideos(getYouTubeVideos, this,
+						swipeRefreshLayout, false).subscribe());
+			}
 		}
-
 	}
 
+    public synchronized void notifyVideoGridUpdated() {
+        refreshHappens = false;
+        if (videoGridUpdated != null) {
+            int itemCount = getItemCount();
+            videoGridUpdated.onVideoGridUpdated(itemCount > 0);
+        }
+    }
+
+	@Override
+	public void onViewRecycled(@NonNull GridViewHolder holder) {
+		holder.clearBackgroundTasks();
+	}
 
 	public void setSwipeRefreshLayout(SwipeRefreshLayout swipeRefreshLayout) {
 		this.swipeRefreshLayout = swipeRefreshLayout;
@@ -230,9 +271,13 @@ public class VideoGridAdapter extends RecyclerViewAdapterEx<CardData, GridViewHo
 		return currentVideoCategory;
 	}
 
-	@Override
-	public void onVideoStatusUpdated() {
-		notifyDataSetChanged();
-	}
+    @Override
+    public void onVideoStatusUpdated(CardData video) {
+        if (video != null) {
+            replace(item -> Objects.equals(item.getId(), video.getId()), video);
+        } else {
+            notifyDataSetChanged();
+        }
+    }
 }
 

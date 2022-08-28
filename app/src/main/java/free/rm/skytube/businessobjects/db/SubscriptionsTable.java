@@ -17,6 +17,8 @@
 
 package free.rm.skytube.businessobjects.db;
 
+import android.database.sqlite.SQLiteDatabase;
+
 /**
  * YouTube channels subscriptions table.
  */
@@ -32,6 +34,7 @@ public class SubscriptionsTable {
 	public static final String COL_THUMBNAIL_NORMAL_URL = "Thumbnail_Normal_Url";
 	public static final String COL_BANNER_URL = "Banner_Url";
 	public static final String COL_SUBSCRIBER_COUNT = "Subscriber_Count";
+	public static final Column COL_CATEGORY_ID = new Column("category_id", "INTEGER");
 	public static final String[] ALL_COLUMNS = new String[]{
 			SubscriptionsTable.COL_CHANNEL_ID,
 			SubscriptionsTable.COL_TITLE,
@@ -39,6 +42,7 @@ public class SubscriptionsTable {
 			SubscriptionsTable.COL_BANNER_URL,
 			SubscriptionsTable.COL_THUMBNAIL_NORMAL_URL,
 			SubscriptionsTable.COL_SUBSCRIBER_COUNT,
+			SubscriptionsTable.COL_CATEGORY_ID.name,
 			SubscriptionsTable.COL_LAST_VISIT_TIME,
 			SubscriptionsTable.COL_LAST_CHECK_TIME};
 
@@ -53,11 +57,11 @@ public class SubscriptionsTable {
 				COL_THUMBNAIL_NORMAL_URL+ " TEXT, " +
 				COL_BANNER_URL      	+ " TEXT, " +
 				COL_SUBSCRIBER_COUNT	+ " INTEGER, " +
+				COL_CATEGORY_ID.format() + ", " +
 				COL_LAST_VISIT_TIME 	+ " TIMESTAMP DEFAULT (strftime('%s', 'now')), " +
 				COL_LAST_CHECK_TIME 	+ " INTEGER " +
 		" )";
 	}
-
 
 	public static String[] getAddColumns() {
 		return new String[]{
@@ -68,6 +72,10 @@ public class SubscriptionsTable {
 				ADD_COLUMN + COL_SUBSCRIBER_COUNT + " INTEGER"
 		};
 	}
+
+    public static void addCategoryColumn(SQLiteDatabase db) {
+        SQLiteOpenHelperEx.addColumn(db, TABLE_NAME, COL_CATEGORY_ID);
+    }
 
 	public static String[] getLastCheckTimeColumn() {
 		return new String[] { ADD_COLUMN + COL_LAST_CHECK_TIME + " INTEGER "};

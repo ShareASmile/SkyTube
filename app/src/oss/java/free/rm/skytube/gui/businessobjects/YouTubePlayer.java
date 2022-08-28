@@ -22,13 +22,9 @@ import android.content.Intent;
 import android.net.Uri;
 
 import free.rm.skytube.businessobjects.YouTube.POJOs.YouTubeVideo;
-import free.rm.skytube.businessobjects.YouTube.POJOs.YouTubeChannel;
-import free.rm.skytube.businessobjects.YouTube.POJOs.YouTubePlaylist;
 import free.rm.skytube.businessobjects.YouTube.newpipe.ContentId;
-import free.rm.skytube.gui.activities.MainActivity;
 import free.rm.skytube.gui.activities.YouTubePlayerActivity;
-import free.rm.skytube.gui.fragments.ChannelBrowserFragment;
-import free.rm.skytube.gui.fragments.PlaylistVideosFragment;
+import io.reactivex.rxjava3.disposables.Disposable;
 
 import static free.rm.skytube.gui.activities.YouTubePlayerActivity.YOUTUBE_VIDEO_OBJ;
 
@@ -54,11 +50,11 @@ public class YouTubePlayer {
 	 *
 	 * @param videoId ContentId of the video to be watched.
 	 */
-	public static void launch(ContentId videoId, Context context) {
+	public static Disposable launch(ContentId videoId, Context context) {
 		Intent i = new Intent(context, YouTubePlayerActivity.class);
 		i.setAction(Intent.ACTION_VIEW);
 		i.setData(Uri.parse(videoId.getCanonicalUrl()));
 		context.startActivity(i);
+		return Disposable.empty();
 	}
-
 }

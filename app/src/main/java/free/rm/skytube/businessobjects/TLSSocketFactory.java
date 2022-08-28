@@ -1,4 +1,5 @@
 package free.rm.skytube.businessobjects;
+
 import android.util.Log;
 
 import java.io.IOException;
@@ -89,7 +90,7 @@ public class TLSSocketFactory extends SSLSocketFactory {
     }
 
     private Socket enableTLSOnSocket(Socket socket) {
-        if (socket != null && (socket instanceof SSLSocket)) {
+        if (socket instanceof SSLSocket) {
             String[] protocols = filterTLS((SSLSocket) socket);
             if (protocols.length > 0) {
                 ((SSLSocket) socket).setEnabledProtocols(protocols);
@@ -113,6 +114,6 @@ public class TLSSocketFactory extends SSLSocketFactory {
             }
         }
         Log.i("TLSSocketFactory", "Enabled protocols: "+result);
-        return result.toArray(new String[result.size()]);
+        return result.toArray(new String[0]);
     }
 }

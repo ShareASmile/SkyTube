@@ -17,31 +17,27 @@
 
 package free.rm.skytube.gui.businessobjects.views;
 
-import android.content.ClipData;
-import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
-import android.os.Build;
-import android.text.Html;
 import android.text.SpannableStringBuilder;
 import android.text.Spanned;
 import android.text.style.URLSpan;
 import android.text.util.Linkify;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import androidx.appcompat.app.AlertDialog;
+import androidx.core.text.HtmlCompat;
+import androidx.core.text.util.LinkifyCompat;
 
 import org.schabi.newpipe.extractor.StreamingService;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
 import free.rm.skytube.R;
 import free.rm.skytube.app.SkyTubeApp;
-import free.rm.skytube.app.Utils;
-import free.rm.skytube.businessobjects.GetVideoDetailsTask;
-import free.rm.skytube.businessobjects.Logger;
+import free.rm.skytube.businessobjects.YouTube.YouTubeTasks;
 import free.rm.skytube.businessobjects.YouTube.newpipe.ContentId;
 import free.rm.skytube.businessobjects.db.BookmarksDb;
 
@@ -51,6 +47,8 @@ import free.rm.skytube.businessobjects.db.BookmarksDb;
  * party Android apps.
  */
 public class Linker {
+
+	private final static String TAG = Linker.class.getSimpleName();
 
 	public static void configure(TextView textView) {
 		textView.setAutoLinkMask(0);
@@ -62,7 +60,6 @@ public class Linker {
 	 * @param text
 	 */
 	public static void setTextAndLinkify(TextView textView, String text) {
-		Logger.i(Linker.class.getSimpleName(), "setText: %s", text);
 		Spanned spanns = span(text);
 		textView.setText(spanns);
 	}
@@ -71,7 +68,7 @@ public class Linker {
 		if (isText(text)) {
 			return spanText(text);
 		} else {
-			return spanHtml(text);
+			return HtmlCompat.fromHtml(text, HtmlCompat.FROM_HTML_MODE_LEGACY);
 		}
 	}
 
@@ -82,17 +79,8 @@ public class Linker {
 
 	private static Spanned spanText(String text) {
 		SpannableStringBuilder spanner = new SpannableStringBuilder(text);
-		Linkify.addLinks(spanner, Linkify.WEB_URLS);
+		LinkifyCompat.addLinks(spanner, Linkify.WEB_URLS);
 		return spanner;
-	}
-
-	private static Spanned spanHtml(String content) {
-		if (Build.VERSION.SDK_INT >= 24) {
-			return Html.fromHtml(content, 0);
-		} else {
-			//noinspection deprecation
-			return Html.fromHtml(content);
-		}
 	}
 
 	/**
@@ -110,7 +98,6 @@ public class Linker {
 
 		@Override
 		public void onClick(URLSpan span, boolean longClick) {
-			Logger.i(Linker.class.getSimpleName(), "onClick: %s, longClick= %s", span.getURL(), longClick);
 			if (longClick) {
 				longClick(span.getURL());
 			} else {
@@ -132,7 +119,7 @@ public class Linker {
 			} else {
 				isBookmarked = false;
 			}
-			AlertDialog.Builder builder = new AlertDialog.Builder(ctx)
+			new AlertDialog.Builder(ctx)
 					.setTitle(clickedText)
 					.setItems(items.toArray(new CharSequence[0]),
 							(dialog, which) -> {
@@ -141,10 +128,7 @@ public class Linker {
 										SkyTubeApp.viewInBrowser(clickedText, ctx);
 										break;
 									case 1:
-										ClipboardManager clipboard = (ClipboardManager) ctx.getSystemService(Context.CLIPBOARD_SERVICE);
-										ClipData clip = ClipData.newPlainText("URL", clickedText);
-										clipboard.setPrimaryClip(clip);
-										Toast.makeText(ctx, R.string.url_copied_to_clipboard, Toast.LENGTH_SHORT).show();
+										SkyTubeApp.copyUrl(ctx, "URL", clickedText);
 										break;
 									case 2:
 										Intent intent = new Intent(Intent.ACTION_SEND);
@@ -153,17 +137,18 @@ public class Linker {
 										ctx.startActivity(Intent.createChooser(intent, ctx.getString(R.string.share_via)));
 										break;
 									case 3:
-										new GetVideoDetailsTask(ctx, content, (videoUrl, video) -> {
-											if(!isBookmarked) {
-												video.bookmarkVideo(ctx);
-											} else {
-												video.unbookmarkVideo(ctx, null);
-											}
-										}).executeInParallel();
+										YouTubeTasks.getVideoDetails(ctx, content)
+												.flatMapSingle(video -> {
+													if(!isBookmarked) {
+														return video.bookmarkVideo(ctx);
+													} else {
+														return video.unbookmarkVideo(ctx, null);
+													}
+												}).subscribe();
 										break;
 								}
-							});
-			builder.create().show();
+							})
+					.show();
 		}
 	}
 

@@ -18,6 +18,11 @@
 package free.rm.skytube.businessobjects.YouTube.POJOs;
 
 import com.google.api.client.util.ArrayMap;
+import com.google.api.client.util.DateTime;
+
+import org.ocpsoft.prettytime.PrettyTime;
+
+import java.time.Instant;
 
 /**
  * A YouTube comment.
@@ -30,6 +35,8 @@ public class YouTubeComment {
 	private Long likeCount;
 	private String thumbnailUrl;
 	private String authorChannelId;
+	private boolean pinned;
+	private boolean heartedByUploader;
 
 	public YouTubeComment(com.google.api.services.youtube.model.Comment comment) {
 		if (comment.getSnippet() != null) {
@@ -38,19 +45,22 @@ public class YouTubeComment {
 			if(channelIdMap != null)
 				this.authorChannelId = channelIdMap.get("value");
 			this.comment = comment.getSnippet().getTextDisplay();
-			this.datePublished = new PrettyTimeEx().format(comment.getSnippet().getPublishedAt());
+			final DateTime publishedAt = comment.getSnippet().getPublishedAt();
+			this.datePublished = new PrettyTime().format(Instant.ofEpochMilli(publishedAt.getValue()));
 			this.likeCount = comment.getSnippet().getLikeCount();
 			this.thumbnailUrl = comment.getSnippet().getAuthorProfileImageUrl();
 		}
 	}
 
-	public YouTubeComment(String authorChannelId, String author, String thumbnailUrl, String comment, String datePublished, Long likeCount) {
+	public YouTubeComment(String authorChannelId, String author, String thumbnailUrl, String comment, String datePublished, long likeCount, boolean pinned, boolean heartedByUploader) {
 		this.author = author;
 		this.comment = comment;
 		this.datePublished = datePublished;
-		this.likeCount = likeCount;
+		this.likeCount = (0 <= likeCount ? Long.valueOf(likeCount) : null);
 		this.thumbnailUrl = thumbnailUrl;
 		this.authorChannelId = authorChannelId;
+		this.pinned = pinned;
+		this.heartedByUploader = heartedByUploader;
 	}
 
 	public String getAuthor() {
@@ -74,4 +84,12 @@ public class YouTubeComment {
 	}
 
 	public String getAuthorChannelId() { return authorChannelId; }
+
+	public boolean isPinned() {
+		return pinned;
+	}
+
+	public boolean isHeartedByUploader() {
+		return heartedByUploader;
+	}
 }

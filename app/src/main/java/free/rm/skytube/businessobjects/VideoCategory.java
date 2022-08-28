@@ -26,12 +26,13 @@ import free.rm.skytube.businessobjects.YouTube.GetChannelVideosLite;
 import free.rm.skytube.businessobjects.YouTube.GetDownloadedVideos;
 import free.rm.skytube.businessobjects.YouTube.GetFeaturedVideos;
 import free.rm.skytube.businessobjects.YouTube.GetMostPopularVideos;
-import free.rm.skytube.businessobjects.YouTube.GetPlaylistVideos;
 import free.rm.skytube.businessobjects.YouTube.GetYouTubeVideos;
 import free.rm.skytube.businessobjects.YouTube.NewPipeChannelVideos;
+import free.rm.skytube.businessobjects.YouTube.NewPipePlaylistVideos;
 import free.rm.skytube.businessobjects.YouTube.NewPipeVideoBySearch;
 import free.rm.skytube.businessobjects.YouTube.POJOs.YouTubeAPIKey;
 import free.rm.skytube.businessobjects.YouTube.newpipe.NewPipeService;
+import free.rm.skytube.businessobjects.YouTube.newpipe.NewPipeTrendingItems;
 import free.rm.skytube.businessobjects.db.Tasks.GetSubscriptionsVideosFromDb;
 
 /**
@@ -80,13 +81,13 @@ public enum VideoCategory {
 	public GetYouTubeVideos createGetYouTubeVideos() {
 		switch (this) {
 			case FEATURED: return new GetFeaturedVideos();
-			case MOST_POPULAR: return new GetMostPopularVideos();
+			case MOST_POPULAR: return new NewPipeTrendingItems(); //new GetMostPopularVideos();
 			case SEARCH_QUERY: return new NewPipeVideoBySearch();
 			case CHANNEL_VIDEOS: return (GetYouTubeVideos) createChannelVideosFetcher();
 			case SUBSCRIPTIONS_FEED_VIDEOS: return new GetSubscriptionsVideosFromDb();
 			case BOOKMARKS_VIDEOS: return new GetBookmarksVideos();
 			case MIXED_PLAYLIST_VIDEOS:
-			case PLAYLIST_VIDEOS: return new GetPlaylistVideos();
+			case PLAYLIST_VIDEOS: return new NewPipePlaylistVideos();// new GetPlaylistVideos();
 			case DOWNLOADED_VIDEOS: return new GetDownloadedVideos();
 		}
 		// this will notify the developer that he forgot to edit this method when a new type is added

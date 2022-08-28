@@ -17,6 +17,7 @@
 package free.rm.skytube.gui.businessobjects;
 
 import android.content.Context;
+
 import androidx.annotation.NonNull;
 
 import free.rm.skytube.R;
@@ -29,7 +30,7 @@ import free.rm.skytube.businessobjects.db.PlaybackStatusDb;
  */
 public class ResumeVideoTask {
 
-    public static interface Callback {
+    public interface Callback {
         void loadVideo(int position);
     }
 
@@ -49,7 +50,7 @@ public class ResumeVideoTask {
      *
      */
     public void ask() {
-        if(!SkyTubeApp.getPreferenceManager().getBoolean(context.getString(R.string.pref_key_disable_playback_status), false)) {
+        if (SkyTubeApp.getSettings().isPlaybackStatusEnabled()) {
             final PlaybackStatusDb.VideoWatchedStatus watchStatus = PlaybackStatusDb.getPlaybackStatusDb().getVideoWatchedStatus(videoId);
             if (watchStatus.getPosition() > 0) {
                 new SkyTubeMaterialDialog(context)

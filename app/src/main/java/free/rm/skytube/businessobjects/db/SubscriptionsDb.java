@@ -23,19 +23,19 @@ import android.database.Cursor;
 import android.database.SQLException;
 import android.database.sqlite.SQLiteDatabase;
 
-import com.google.api.client.util.DateTime;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import com.google.gson.JsonSerializationContext;
 import com.google.gson.JsonSerializer;
 
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.IOException;
-import java.lang.reflect.Type;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -50,35 +50,34 @@ import free.rm.skytube.businessobjects.Logger;
 import free.rm.skytube.businessobjects.YouTube.POJOs.ChannelView;
 import free.rm.skytube.businessobjects.YouTube.POJOs.YouTubeChannel;
 import free.rm.skytube.businessobjects.YouTube.POJOs.YouTubeVideo;
-import free.rm.skytube.gui.fragments.SubscriptionsFeedFragment;
+import io.reactivex.rxjava3.core.Single;
+import io.reactivex.rxjava3.schedulers.Schedulers;
 
 /**
  * A database (DB) that stores user subscriptions (with respect to YouTube channels).
  */
 public class SubscriptionsDb extends SQLiteOpenHelperEx {
-    private static final String CHANNEL_HAS_NEW_VIDEO_QUERY = String.format("SELECT COUNT(*) FROM %s WHERE %s = ? AND %s > ?", SubscriptionsVideosTable.TABLE_NAME, SubscriptionsVideosTable.COL_CHANNEL_ID, SubscriptionsVideosTable.COL_YOUTUBE_VIDEO_DATE);
-    private static final String VIDEO_DATE_IS_OLDER_THAN_1_MONTH = String.format("%s < DATETIME('now', '-1 month')", SubscriptionsVideosTable.COL_YOUTUBE_VIDEO_DATE);
-    private static final String SUBSCRIBED_NUMBER_OF_CHANNELS_QUERY = String.format("SELECT COUNT(*) FROM %s", SubscriptionsTable.TABLE_NAME);
-    private static final String HAS_VIDEO_QUERY = String.format("SELECT COUNT(*) FROM %s WHERE %s = ?", SubscriptionsVideosTable.TABLE_NAME, SubscriptionsVideosTable.COL_YOUTUBE_VIDEO_ID);
-	private static final String GET_VIDEO_IDS = String.format("SELECT %s FROM %s", SubscriptionsVideosTable.COL_YOUTUBE_VIDEO_ID, SubscriptionsVideosTable.TABLE_NAME);
+    private static final String HAS_VIDEO_QUERY = String.format("SELECT COUNT(*) FROM %s WHERE %s = ?", SubscriptionsVideosTable.TABLE_NAME_V2, SubscriptionsVideosTable.COL_YOUTUBE_VIDEO_ID);
     private static final String GET_VIDEO_IDS_BY_CHANNEL_TO_PUBLISH_TS = String.format("SELECT %s,%s FROM %s WHERE %s = ?",
-            SubscriptionsVideosTable.COL_YOUTUBE_VIDEO_ID, SubscriptionsVideosTable.COL_PUBLISH_TS, SubscriptionsVideosTable.TABLE_NAME, SubscriptionsVideosTable.COL_CHANNEL_ID);
+            SubscriptionsVideosTable.COL_YOUTUBE_VIDEO_ID, SubscriptionsVideosTable.COL_PUBLISH_TIME.name, SubscriptionsVideosTable.TABLE_NAME_V2, SubscriptionsVideosTable.COL_CHANNEL_ID);
     private static final String GET_VIDEO_IDS_BY_CHANNEL = String.format("SELECT %s FROM %s WHERE %s = ?",
-            SubscriptionsVideosTable.COL_YOUTUBE_VIDEO_ID, SubscriptionsVideosTable.TABLE_NAME, SubscriptionsVideosTable.COL_CHANNEL_ID);
-    private static final String FIND_EMPTY_RETRIEVAL_TS = String.format("SELECT %s FROM %s WHERE %s IS NULL",
-            SubscriptionsVideosTable.COL_YOUTUBE_VIDEO, SubscriptionsVideosTable.TABLE_NAME, SubscriptionsVideosTable.COL_RETRIEVAL_TS);
+            SubscriptionsVideosTable.COL_YOUTUBE_VIDEO_ID, SubscriptionsVideosTable.TABLE_NAME_V2, SubscriptionsVideosTable.COL_CHANNEL_ID);
+    private static final String FIND_EMPTY_RETRIEVAL_TS = String.format("SELECT %s,%s FROM %s WHERE %s IS NULL",
+			SubscriptionsVideosTable.COL_YOUTUBE_VIDEO_ID, SubscriptionsVideosTable.COL_YOUTUBE_VIDEO, SubscriptionsVideosTable.TABLE_NAME, SubscriptionsVideosTable.COL_RETRIEVAL_TS);
 	private static final String sortChannelsASC = "LOWER(" + SubscriptionsTable.COL_TITLE + ") ASC ";
 
 	private static final String SUBSCRIBED_CHANNEL_INFO = String.format("SELECT %1$s,%2$s,%3$s,%4$s,(select max(%6$s) from %7$s videos where videos.%8$s = subs.%1$s) as latest_video_ts FROM %5$s subs",
 			SubscriptionsTable.COL_CHANNEL_ID, SubscriptionsTable.COL_TITLE, SubscriptionsTable.COL_THUMBNAIL_NORMAL_URL, SubscriptionsTable.COL_LAST_VISIT_TIME,
 			SubscriptionsTable.TABLE_NAME,
-			SubscriptionsVideosTable.COL_PUBLISH_TS, SubscriptionsVideosTable.TABLE_NAME, SubscriptionsVideosTable.COL_CHANNEL_ID);
+			SubscriptionsVideosTable.COL_PUBLISH_TIME.name, SubscriptionsVideosTable.TABLE_NAME_V2, SubscriptionsVideosTable.COL_CHANNEL_ID);
 	private static final String SUBSCRIBED_CHANNEL_INFO_ORDER_BY = " ORDER BY "+sortChannelsASC;
 	private static final String SUBSCRIBED_CHANNEL_LIMIT_BY_TITLE = " WHERE LOWER(" +SubscriptionsTable.COL_TITLE + ") like ?";
 
+	private static final String IS_SUBSCRIBED_QUERY = String.format("SELECT EXISTS(SELECT %s FROM %s WHERE %s =?) AS VAL ", SubscriptionsTable.COL_ID, SubscriptionsTable.TABLE_NAME, SubscriptionsTable.COL_CHANNEL_ID);
 	private static volatile SubscriptionsDb subscriptionsDb = null;
 
-	private static final int DATABASE_VERSION = 5;
+    private static final int DATABASE_VERSION = 9;
+
 	private static final String DATABASE_NAME = "subs.db";
 
 	private Gson gson;
@@ -97,18 +96,14 @@ public class SubscriptionsDb extends SQLiteOpenHelperEx {
 		return subscriptionsDb;
 	}
 
-	@Override
-	protected void clearDatabaseInstance() {
-		subscriptionsDb = null;
-	}
-
-	@Override
-	public void onCreate(SQLiteDatabase db) {
-		db.execSQL(SubscriptionsTable.getCreateStatement());
-		db.execSQL(SubscriptionsVideosTable.getCreateStatement());
-		db.execSQL(LocalChannelTable.getCreateStatement());
-	}
-
+    @Override
+    public void onCreate(SQLiteDatabase db) {
+        db.execSQL(SubscriptionsTable.getCreateStatement());
+        SubscriptionsVideosTable.addNewFlatTable(db);
+        db.execSQL(LocalChannelTable.getCreateStatement());
+        db.execSQL(CategoriesTable.getCreateStatement());
+        new CategoryManagement(db).setupDefaultCategories();
+    }
 
 	@Override
 	public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
@@ -140,29 +135,75 @@ public class SubscriptionsDb extends SQLiteOpenHelperEx {
 				Logger.e(this, "Unable to load subscribed channels to populate cache:" + ex.getMessage(), ex);
 			}
 		}
-	}
+        if (oldVersion <= 6 && newVersion >= 7) {
+            db.execSQL(SubscriptionsVideosTable.getIndexOnVideos());
+        }
+        if (oldVersion <= 7 && newVersion >= 8) {
+            continueOnError(db, CategoriesTable.getCreateStatement());
+            new CategoryManagement(db).setupDefaultCategories();
+            SubscriptionsTable.addCategoryColumn(db);
+        }
+        if (oldVersion <= 8 && newVersion >= 9) {
+            SubscriptionsVideosTable.addNewFlatTable(db);
+            migrateFromJsonColumn(db);
+        }
+//        migrateFromJsonColumn(db);
+    }
 
-	private static void execSQLUpdates(SQLiteDatabase db, String[] sqlUpdates) {
-		for (String sqlUpdate : sqlUpdates) {
-			db.execSQL(sqlUpdate);
-		}
-	}
+    private void migrateFromJsonColumn(final SQLiteDatabase db) {
+        int fullCount = 0;
+        while (true) {
+            int success = migrateFromJsonColumnBlock(db);
+            if (success > 0) {
+                fullCount += success;
+            } else {
+                Logger.w(this, "Migrated " + fullCount + " videos");
+                return;
+            }
+        }
+    }
+
+    private int migrateFromJsonColumnBlock(final SQLiteDatabase db) {
+        int counter = 0;
+        int success = 0;
+        try (Cursor cursor = db.query(SubscriptionsVideosTable.TABLE_NAME,
+                new String[] { SubscriptionsVideosTable.COL_YOUTUBE_VIDEO_ID, SubscriptionsVideosTable.COL_YOUTUBE_VIDEO},
+                null,
+                null,null, null, null, "100")) {
+            while (cursor.moveToNext()) {
+                counter ++;
+                String id = cursor.getString(0);
+                final byte[] blob = cursor.getBlob(1);
+                final String videoJson = new String(blob);
+
+                // convert JSON into YouTubeVideo
+                YouTubeVideo video = gson.fromJson(videoJson, YouTubeVideo.class);
+                ContentValues values = convertToContentValues(video, null);
+                long rowId = db.insert(SubscriptionsVideosTable.TABLE_NAME_V2, null, values);
+                if (rowId > 0) {
+                    success ++;
+                }
+            }
+        }
+        Logger.w(this, "Loaded " + counter + " videos, updated " + success + " videos successfully");
+        return success;
+    }
 
 	private void setupRetrievalTimestamp(SQLiteDatabase db) {
         List<YouTubeVideo> videos = extractVideos(db.rawQuery(FIND_EMPTY_RETRIEVAL_TS, null), false);
         int count = 0;
         for (YouTubeVideo video : videos) {
-            DateTime dateTime = video.getPublishDate();
-            if (dateTime != null) {
+            final Long publishTimestamp = video.getPublishTimestamp();
+            if (publishTimestamp != null) {
                 ContentValues values = new ContentValues();
-                values.put(SubscriptionsVideosTable.COL_PUBLISH_TS, dateTime.getValue());
-                values.put(SubscriptionsVideosTable.COL_RETRIEVAL_TS, dateTime.getValue());
+                values.put(SubscriptionsVideosTable.COL_PUBLISH_TS, publishTimestamp);
+                values.put(SubscriptionsVideosTable.COL_RETRIEVAL_TS, publishTimestamp);
                 int updateCount = db.update(
                         SubscriptionsVideosTable.TABLE_NAME,
                         values,
                         SubscriptionsVideosTable.COL_YOUTUBE_VIDEO_ID_EQUALS_TO,
                         new String[]{video.getId()});
-                Logger.i(this,"updating " + video.getId() + " with publish date:" + dateTime + " -> " + updateCount);
+                Logger.i(this,"updating " + video.getId() + " with publish date:" + ZonedDateTime.ofInstant(Instant.ofEpochMilli(publishTimestamp), ZoneId.systemDefault()) + " -> " + updateCount);
                 count += updateCount;
             }
         }
@@ -177,6 +218,7 @@ public class SubscriptionsDb extends SQLiteOpenHelperEx {
 	 * @return DatabaseResult.SUCCESS if the operation was successful; NOT_MODIFIED or ERROR otherwise.
 	 */
 	public DatabaseResult subscribe(YouTubeChannel channel) {
+		SkyTubeApp.nonUiThread();
 		saveChannelVideos(channel.getYouTubeVideos(), channel.getId());
 
 		return saveSubscription(channel);
@@ -190,6 +232,8 @@ public class SubscriptionsDb extends SQLiteOpenHelperEx {
 	 * @return True if the operation was successful; false otherwise.
 	 */
 	private DatabaseResult saveSubscription(YouTubeChannel channel) {
+		SkyTubeApp.nonUiThread();
+
 		ContentValues values = new ContentValues();
 		values.put(SubscriptionsTable.COL_CHANNEL_ID, channel.getId());
 		values.put(SubscriptionsTable.COL_LAST_VISIT_TIME, channel.getLastVisitTime());
@@ -197,6 +241,7 @@ public class SubscriptionsDb extends SQLiteOpenHelperEx {
 		values.put(SubscriptionsTable.COL_DESCRIPTION, channel.getDescription());
 		values.put(SubscriptionsTable.COL_BANNER_URL, channel.getBannerUrl());
 		values.put(SubscriptionsTable.COL_THUMBNAIL_NORMAL_URL, channel.getThumbnailUrl());
+		values.put(SubscriptionsTable.COL_CATEGORY_ID.name, channel.getCategoryId());
 		values.put(SubscriptionsTable.COL_SUBSCRIBER_COUNT, channel.getSubscriberCount());
 
 		SQLiteDatabase db = getWritableDatabase();
@@ -217,7 +262,6 @@ public class SubscriptionsDb extends SQLiteOpenHelperEx {
 		}
 	}
 
-
 	/**
 	 * Removes the given channel from the subscriptions DB.
 	 *
@@ -226,8 +270,10 @@ public class SubscriptionsDb extends SQLiteOpenHelperEx {
 	 * @return True if the operation was successful; false otherwise.
 	 */
 	public DatabaseResult unsubscribe(String channelId) {
+		SkyTubeApp.nonUiThread();
+
 		// delete any feed videos pertaining to this channel
-		getWritableDatabase().delete(SubscriptionsVideosTable.TABLE_NAME,
+		getWritableDatabase().delete(SubscriptionsVideosTable.TABLE_NAME_V2,
 				SubscriptionsVideosTable.COL_CHANNEL_ID + " = ?",
 				new String[]{channelId});
 
@@ -237,9 +283,14 @@ public class SubscriptionsDb extends SQLiteOpenHelperEx {
 				new String[]{channelId});
 
 		// Need to make sure when we come back to MainActivity, that we refresh the Feed tab so it hides videos from the newly unsubscribed
-		SubscriptionsFeedFragment.setFlag(SubscriptionsFeedFragment.FLAG_REFRESH_FEED_FROM_CACHE);
+		SkyTubeApp.getSettings().setRefreshSubsFeedFromCache(true);
 
 		return (rowsDeleted >= 0) ? DatabaseResult.SUCCESS : DatabaseResult.NOT_MODIFIED;
+	}
+
+	public void unsubscribeFromAllChannels() {
+		getWritableDatabase().delete(SubscriptionsVideosTable.TABLE_NAME_V2,null,null);
+		getWritableDatabase().delete(SubscriptionsTable.TABLE_NAME,null,null);
 	}
 
 	/**
@@ -247,6 +298,7 @@ public class SubscriptionsDb extends SQLiteOpenHelperEx {
 	 * @return all the video ids for the subscribed channels from the database.
 	 */
 	public Set<String> getSubscribedChannelVideosByChannel(String channelId) {
+		SkyTubeApp.nonUiThread();
 		try(Cursor cursor = getReadableDatabase().rawQuery(GET_VIDEO_IDS_BY_CHANNEL, new String[] { channelId})) {
 			Set<String> result = new HashSet<>();
 			while(cursor.moveToNext()) {
@@ -261,6 +313,7 @@ public class SubscriptionsDb extends SQLiteOpenHelperEx {
      * @return all the video ids for the subscribed channels from the database, mapped to publication times
      */
     public Map<String, Long> getSubscribedChannelVideosByChannelToTimestamp(String channelId) {
+        SkyTubeApp.nonUiThread();
         try(Cursor cursor = getReadableDatabase().rawQuery(GET_VIDEO_IDS_BY_CHANNEL_TO_PUBLISH_TS, new String[] { channelId})) {
             Map<String, Long> result = new HashMap<>();
             while(cursor.moveToNext()) {
@@ -270,25 +323,70 @@ public class SubscriptionsDb extends SQLiteOpenHelperEx {
         }
     }
 
-    public int setPublishTimestamp(YouTubeVideo video) {
+    public void updateVideo(YouTubeVideo video) {
+        ContentValues values = convertToContentValues(video, null);
+        getWritableDatabase().update(
+                SubscriptionsVideosTable.TABLE_NAME_V2,
+                values,
+                SubscriptionsVideosTable.COL_YOUTUBE_VIDEO_ID_EQUALS_TO,
+                new String[] { video.getId() });
+    }
+
+    private ContentValues convertToContentValues(final YouTubeVideo video, String channelId) {
         ContentValues values = new ContentValues();
-        values.put(SubscriptionsVideosTable.COL_PUBLISH_TS, video.getPublishTimestamp());
+        values.put(SubscriptionsVideosTable.COL_CHANNEL_ID_V2.name, channelId != null ? channelId : video.getChannelId());
+        values.put(SubscriptionsVideosTable.COL_CHANNEL_TITLE.name, video.getSafeChannelName());
+        values.put(SubscriptionsVideosTable.COL_YOUTUBE_VIDEO_ID_V2.name, video.getId());
+        values.put(SubscriptionsVideosTable.COL_CATEGORY_ID.name, video.getCategoryId());
+        values.put(SubscriptionsVideosTable.COL_PUBLISH_TIME_EXACT.name, video.getPublishTimestampExact());
+        values.put(SubscriptionsVideosTable.COL_PUBLISH_TIME.name, video.getPublishTimestamp());
+        if (video.getLikeCountNumber() != null) {
+            values.put(SubscriptionsVideosTable.COL_LIKES.name, video.getLikeCountNumber());
+        }
+        if (video.getDislikeCountNumber() != null) {
+            values.put(SubscriptionsVideosTable.COL_DISLIKES.name, video.getDislikeCountNumber());
+        }
+        if (video.getViewsCountInt() != null) {
+            values.put(SubscriptionsVideosTable.COL_VIEWS.name, video.getViewsCountInt().longValue());
+        }
+        if (video.getTitle() != null) {
+            values.put(SubscriptionsVideosTable.COL_TITLE.name, video.getTitle());
+        }
+        if (video.getDescription() != null) {
+            values.put(SubscriptionsVideosTable.COL_DESCRIPTION.name, video.getDescription());
+        }
+        values.put(SubscriptionsVideosTable.COL_DURATION.name, video.getDurationInSeconds());
+        if (video.getThumbnailUrl() != null) {
+            values.put(SubscriptionsVideosTable.COL_THUMBNAIL_URL.name, video.getThumbnailUrl());
+        }
+        return values;
+    }
+
+	public int setPublishTimestamp(YouTubeVideo video) {
+        ContentValues values = new ContentValues();
+        values.put(SubscriptionsVideosTable.COL_PUBLISH_TIME.name, video.getPublishTimestamp());
 
         return getWritableDatabase().update(
-                SubscriptionsVideosTable.TABLE_NAME,
+                SubscriptionsVideosTable.TABLE_NAME_V2,
                 values,
                 SubscriptionsVideosTable.COL_YOUTUBE_VIDEO_ID_EQUALS_TO,
                 new String[] { video.getId() });
     }
 
 	public List<String> getSubscribedChannelIds() {
-		try (Cursor cursor = getReadableDatabase().query(SubscriptionsTable.TABLE_NAME, new String[] {SubscriptionsTable.COL_CHANNEL_ID}, null, null, null, null, null)) {
+		SkyTubeApp.nonUiThread();
+		try (Cursor cursor = getReadableDatabase().rawQuery("SELECT "+SubscriptionsTable.COL_CHANNEL_ID + " FROM "+SubscriptionsTable.TABLE_NAME,null)) {
 			List<String> result = new ArrayList<>();
 			while(cursor.moveToNext()) {
 				result.add(cursor.getString(0));
 			}
 			return result;
 		}
+	}
+
+	public Single<List<String>> getSubscribedChannelIdsAsync() {
+		return Single.fromCallable(() -> getSubscribedChannelIds())
+				.subscribeOn(Schedulers.io());
 	}
 
 	/**
@@ -299,13 +397,13 @@ public class SubscriptionsDb extends SQLiteOpenHelperEx {
 	 * @throws IOException
 	 */
 	private List<YouTubeChannel> getSubscribedChannels(SQLiteDatabase db) throws IOException {
-		Cursor cursor = null;
-		try {
-			cursor = db.query(SubscriptionsTable.TABLE_NAME,
-					SubscriptionsTable.ALL_COLUMNS,
-					null, null,
-					null, null,
-					SubscriptionsTable.COL_ID + " ASC");
+		SkyTubeApp.nonUiThread();
+
+		try (Cursor cursor = db.query(SubscriptionsTable.TABLE_NAME,
+				SubscriptionsTable.ALL_COLUMNS,
+				null, null,
+				null, null,
+				SubscriptionsTable.COL_ID + " ASC")) {
 
 			List<YouTubeChannel> subsChannels = new ArrayList<>();
 
@@ -318,31 +416,33 @@ public class SubscriptionsDb extends SQLiteOpenHelperEx {
 				final int colSubscribers = cursor.getColumnIndexOrThrow(SubscriptionsTable.COL_SUBSCRIBER_COUNT);
 				final int colLastVisit = cursor.getColumnIndexOrThrow(SubscriptionsTable.COL_LAST_VISIT_TIME);
 				final int colLastCheck = cursor.getColumnIndexOrThrow(SubscriptionsTable.COL_LAST_CHECK_TIME);
+				final int colCategoryId = cursor.getColumnIndexOrThrow(SubscriptionsTable.COL_CATEGORY_ID.name);
 
 				do {
 					final String id = cursor.getString(colChannelIdNum);
+					Integer categoryId = getInteger(cursor, colCategoryId);
 					subsChannels.add(new YouTubeChannel(id, cursor.getString(colTitle),
 							cursor.getString(colDescription), cursor.getString(colThumbnail),
 							cursor.getString(colBanner), cursor.getLong(colSubscribers), true, cursor.getLong(colLastVisit),
-							cursor.getLong(colLastCheck)));
+							cursor.getLong(colLastCheck),
+							categoryId));
 				} while (cursor.moveToNext());
-
 			}
 			return subsChannels;
-		} finally {
-			if (cursor != null) {
-				cursor.close();
-			}
 		}
 	}
 
+	private Integer getInteger(Cursor cursor, int colCategoryId) {
+		return (colCategoryId < 0 || cursor.isNull(colCategoryId)) ? null : cursor.getInt(colCategoryId);
+	}
+
 	public YouTubeChannel getCachedSubscribedChannel(String channelId) {
-		Cursor cursor = null;
-		try {
-			cursor = getReadableDatabase().query(SubscriptionsTable.TABLE_NAME,
-					SubscriptionsTable.ALL_COLUMNS,
-					SubscriptionsTable.COL_CHANNEL_ID + " = ?", new String[] { channelId },
-					null, null,null);
+		SkyTubeApp.nonUiThread();
+
+		try (Cursor cursor = getReadableDatabase().query(SubscriptionsTable.TABLE_NAME,
+				SubscriptionsTable.ALL_COLUMNS,
+				SubscriptionsTable.COL_CHANNEL_ID + " = ?", new String[]{channelId},
+				null, null, null)) {
 
 			YouTubeChannel channel = null;
 
@@ -355,37 +455,23 @@ public class SubscriptionsDb extends SQLiteOpenHelperEx {
 				final int	   colSubscribers = cursor.getColumnIndexOrThrow(SubscriptionsTable.COL_SUBSCRIBER_COUNT);
 				final int	   colLastVisit = cursor.getColumnIndexOrThrow(SubscriptionsTable.COL_LAST_VISIT_TIME);
 				final int	   colLastCheck = cursor.getColumnIndexOrThrow(SubscriptionsTable.COL_LAST_CHECK_TIME);
+				final int	   colCategoryId = cursor.getColumnIndexOrThrow(SubscriptionsTable.COL_CATEGORY_ID.name);
 
 				final String id = cursor.getString(colChannelIdNum);
+				Integer categoryId = getInteger(cursor, colCategoryId);
+
 				channel = new YouTubeChannel(id, cursor.getString(colTitle),
 						cursor.getString(colDescription), cursor.getString(colThumbnail),
 						cursor.getString(colBanner), cursor.getLong(colSubscribers), true,
-						cursor.getLong(colLastVisit), cursor.getLong(colLastCheck));
+						cursor.getLong(colLastVisit), cursor.getLong(colLastCheck),
+						categoryId);
 
 			}
 
 			return channel;
-		} finally {
-			if (cursor != null) {
-				cursor.close();
-			}
 		}
 	}
 
-
-	/**
-	 * @return The total number of subscribed channels.
-	 */
-	public int getTotalSubscribedChannels() {
-		Cursor	cursor = getReadableDatabase().rawQuery(SUBSCRIBED_NUMBER_OF_CHANNELS_QUERY, null);
-		int		totalSubbedChannels = 0;
-
-		if (cursor.moveToFirst())
-			totalSubbedChannels = cursor.getInt(0);
-
-		cursor.close();
-		return totalSubbedChannels;
-	}
 
 
 	/**
@@ -396,18 +482,16 @@ public class SubscriptionsDb extends SQLiteOpenHelperEx {
 	 * @throws IOException
 	 */
 	public boolean isUserSubscribedToChannel(String channelId) {
+		SkyTubeApp.nonUiThread();
 	    channelId = Utils.removeChannelIdPrefix(channelId);
-		Cursor cursor = getReadableDatabase().query(
-				SubscriptionsTable.TABLE_NAME,
-				new String[]{SubscriptionsTable.COL_ID},
-				SubscriptionsTable.COL_CHANNEL_ID + " = ?",
-				new String[]{channelId}, null, null, null);
-		boolean	isUserSubbed = cursor.moveToNext();
 
-		cursor.close();
-		return isUserSubbed;
+		return executeQueryForInteger(IS_SUBSCRIBED_QUERY, new String[]{channelId}, 0) > 0;
 	}
 
+
+	public Single<Boolean> getUserSubscribedToChannel(String channelId) {
+		return Single.fromCallable(() -> isUserSubscribedToChannel(channelId)).subscribeOn(Schedulers.io());
+	}
 
     /**
      * Updates the given channel's last visit time.
@@ -416,22 +500,24 @@ public class SubscriptionsDb extends SQLiteOpenHelperEx {
      *
      * @return	last visit time, if the update was successful;  -1 otherwise.
      */
-    public long updateLastVisitTime(String channelId) {
-        SQLiteDatabase	db = getWritableDatabase();
-        long			currentTime = System.currentTimeMillis();
+    public Single<Long> updateLastVisitTimeAsync(String channelId) {
+        return Single.fromCallable(() -> {
+            SQLiteDatabase	db = getWritableDatabase();
+            long			currentTime = System.currentTimeMillis();
 
-        ContentValues values = new ContentValues();
-        values.put(SubscriptionsTable.COL_LAST_VISIT_TIME, currentTime);
+            ContentValues values = new ContentValues();
+            values.put(SubscriptionsTable.COL_LAST_VISIT_TIME, currentTime);
 
-        int count = db.update(
+            int count = db.update(
                 SubscriptionsTable.TABLE_NAME,
                 values,
                 SubscriptionsTable.COL_CHANNEL_ID + " = ?",
                 new String[]{channelId});
 
-        return (count > 0 ? currentTime : -1);
+            return (count > 0 ? currentTime : -1);
+        }).subscribeOn(Schedulers.io());
     }
-
+    
     /**
      * Updates the given channel's last visit time.
      *
@@ -471,6 +557,7 @@ public class SubscriptionsDb extends SQLiteOpenHelperEx {
 		values.put(SubscriptionsTable.COL_THUMBNAIL_NORMAL_URL, channel.getThumbnailUrl());
 		values.put(SubscriptionsTable.COL_SUBSCRIBER_COUNT, channel.getSubscriberCount());
 		values.put(SubscriptionsTable.COL_LAST_VISIT_TIME, channel.getLastVisitTime());
+		values.put(SubscriptionsTable.COL_CATEGORY_ID.name, channel.getCategoryId());
 
 		int count = db.update(
 				SubscriptionsTable.TABLE_NAME,
@@ -480,86 +567,23 @@ public class SubscriptionsDb extends SQLiteOpenHelperEx {
 		return count > 0;
 	}
 
-	/**
-	 * Returns the last time the user has visited this channel.
-	 *
-	 * @param channel
-	 *
-	 * @return	last visit time, if the update was successful;  -1 otherwise.
-	 * @throws IOException
-	 */
-	public long getLastVisitTime(YouTubeChannel channel) {
-		Cursor	cursor = getReadableDatabase().query(
-							SubscriptionsTable.TABLE_NAME,
-							new String[]{SubscriptionsTable.COL_LAST_VISIT_TIME},
-							SubscriptionsTable.COL_CHANNEL_ID + " = ?",
-							new String[]{channel.getId()}, null, null, null);
-		long	lastVisitTime = -1;
+    private boolean hasVideo(YouTubeVideo video) {
+        return executeQueryForInteger(HAS_VIDEO_QUERY, new String[]{video.getId()}, 0) > 0;
+    }
 
-		if (cursor.moveToNext()) {
-			int colLastVisitTIme = cursor.getColumnIndexOrThrow(SubscriptionsTable.COL_LAST_VISIT_TIME);
-			lastVisitTime = cursor.getLong(colLastVisitTIme);
-		}
-
-		cursor.close();
-		return lastVisitTime;
-	}
-
-
-	private boolean hasVideo(YouTubeVideo video) {
-		Cursor cursor = null;
-		try {
-			cursor = getReadableDatabase().rawQuery(HAS_VIDEO_QUERY, new String[]{video.getId()});
-			if (cursor.moveToFirst()) {
-				return cursor.getInt(0) > 0;
-			}
-			return false;
-		} finally {
-			if (cursor != null) {
-				cursor.close();
-			}
-		}
-	}
-
-
-	/**
-	 * Check if the given channel has new videos (by looking into the {@link SubscriptionsVideosTable}
-	 * [i.e. video cache table]).
-	 *
-	 * @param channel Channel to check.
-	 *
-	 * @return True if the user hasn't visited the channel and new videos have been uploaded in the
-	 * meantime; false otherwise.
-	 */
-	public boolean channelHasNewVideos(YouTubeChannel channel) {
-		//Unfortunately, this doesn't work, due to XXX is not supported on this API level
-		// String formatted = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX", Locale.US).format(channel.getLastVisitTime());
-		String formatted = new DateTime(channel.getLastVisitTime()).toString();
-		Cursor cursor = getReadableDatabase().rawQuery(CHANNEL_HAS_NEW_VIDEO_QUERY,
-							new String[]{channel.getId(), formatted});
-		boolean channelHasNewVideos = false;
-
-		if (cursor.moveToFirst()) {
-			channelHasNewVideos = cursor.getInt(0) > 0;
-		}
-
-		cursor.close();
-		return channelHasNewVideos;
-	}
-
-	/**
-	 * Loop through each video saved in the passed {@link YouTubeChannel} and save it into the database, if it's not already been saved
-	 * @param videos the list of videos
-	 * @param channelId the channel id
-	 */
-	public void saveChannelVideos(Collection<YouTubeVideo> videos, String channelId) {
-		for (YouTubeVideo video : videos) {
-			if(video.getPublishDate() != null && !hasVideo(video)) {
+    /**
+     * Loop through each video saved in the passed {@link YouTubeChannel} and save it into the database, if it's not already been saved
+     * @param videos the list of videos
+     * @param channelId the channel id
+     */
+    public void saveChannelVideos(Collection<YouTubeVideo> videos, String channelId) {
+        for (YouTubeVideo video : videos) {
+            if(video.getPublishTimestamp() != null && !hasVideo(video)) {
                 ContentValues values = createContentValues(video, channelId);
-                getWritableDatabase().insert(SubscriptionsVideosTable.TABLE_NAME, null, values);
-			}
-		}
-	}
+                getWritableDatabase().insert(SubscriptionsVideosTable.TABLE_NAME_V2, null, values);
+            }
+        }
+    }
 
 	/**
 	 * Loop through each video saved in the passed {@link YouTubeChannel} and insert it into the database, or update it.
@@ -567,18 +591,19 @@ public class SubscriptionsDb extends SQLiteOpenHelperEx {
 	 * @param channelId the channel id
 	 */
 	public void saveVideos(List<YouTubeVideo> videos, String channelId) {
+		SkyTubeApp.nonUiThread();
 		SQLiteDatabase db = getWritableDatabase();
 		for (YouTubeVideo video : videos) {
-			if (video.getPublishDate() != null) {
+			if (video.getPublishTimestamp() != null) {
 				ContentValues values = createContentValues(video, channelId);
 				if (hasVideo(video)) {
 					values.remove(SubscriptionsVideosTable.COL_YOUTUBE_VIDEO_ID);
-					db.update(SubscriptionsVideosTable.TABLE_NAME,
+					db.update(SubscriptionsVideosTable.TABLE_NAME_V2,
                             values,
                             SubscriptionsVideosTable.COL_YOUTUBE_VIDEO_ID_EQUALS_TO,
 							new String[]{video.getId()});
 				} else {
-					db.insert(SubscriptionsVideosTable.TABLE_NAME, null, values);
+					db.insert(SubscriptionsVideosTable.TABLE_NAME_V2, null, values);
 				}
 			}
 		}
@@ -588,67 +613,40 @@ public class SubscriptionsDb extends SQLiteOpenHelperEx {
 	 * Insert videos into the subscription video table.
 	 * @param videos
 	 */
-	public void insertVideos(List<YouTubeVideo> videos) {
+	public void insertVideosForChannel(List<YouTubeVideo> videos, String channelId) {
+		SkyTubeApp.nonUiThread();
+
 		SQLiteDatabase db = getWritableDatabase();
 		for (YouTubeVideo video : videos) {
-			if (video.getPublishDate() != null) {
-				ContentValues values = createContentValues(video, video.getChannelId());
-				db.insert(SubscriptionsVideosTable.TABLE_NAME, null, values);
+			if (video.getPublishTimestamp() != null) {
+				ContentValues values = createContentValues(video, channelId);
+				db.insert(SubscriptionsVideosTable.TABLE_NAME_V2, null, values);
 			}
 		}
 	}
 
     private ContentValues createContentValues(YouTubeVideo video, String channelId) {
 		channelId = Utils.removeChannelIdPrefix(channelId);
-        ContentValues values = new ContentValues();
+        ContentValues values = convertToContentValues(video, channelId);
         values.put(SubscriptionsVideosTable.COL_CHANNEL_ID, channelId);
         values.put(SubscriptionsVideosTable.COL_YOUTUBE_VIDEO_ID, video.getId());
-        values.put(SubscriptionsVideosTable.COL_YOUTUBE_VIDEO, gson.toJson(video).getBytes());
-        DateTime publishDate = video.getPublishDate();
-        values.put(SubscriptionsVideosTable.COL_YOUTUBE_VIDEO_DATE, publishDate.toString());
-        long ts = video.getRetrievalTimestamp() != null ? video.getRetrievalTimestamp() : publishDate.getValue();
-        values.put(SubscriptionsVideosTable.COL_RETRIEVAL_TS, ts);
-        values.put(SubscriptionsVideosTable.COL_PUBLISH_TS, publishDate.getValue());
+        // values.put(SubscriptionsVideosTable.COL_YOUTUBE_VIDEO, gson.toJson(video).getBytes());
+        final long publishInstant = video.getPublishTimestamp();
+        values.put(SubscriptionsVideosTable.COL_PUBLISH_TIME.name, publishInstant);
+        values.put(SubscriptionsVideosTable.COL_CATEGORY_ID.name, video.getCategoryId());
 
         return values;
     }
-
-	/**
-	 * Delete any videos stored in the database (for subscribed channels) that are over a month old.
-	 * @return
-	 */
-	public boolean trimSubscriptionVideos() {
-		int result = getWritableDatabase().delete(SubscriptionsVideosTable.TABLE_NAME, VIDEO_DATE_IS_OLDER_THAN_1_MONTH, null);
-		return result > 0;
-	}
-
-	/**
-	 * Query the database to retrieve all videos for subscribed channels.
-	 * @return
-	 */
-	public List<YouTubeVideo> getSubscriptionVideos() {
-		Cursor	cursor = getReadableDatabase().query(
-							SubscriptionsVideosTable.TABLE_NAME,
-							SubscriptionsVideosTable.ALL_COLUMNS_FOR_EXTRACT,
-							null, null, null, null,
-							SubscriptionsVideosTable.COL_YOUTUBE_VIDEO_DATE + " DESC");
-		return extractVideos(cursor, true);
-	}
 
     /**
      * Query the database to retrieve number of videos for subscribed channels starting from the given video.
      * @return a list of {@link YouTubeVideo}
      */
     public List<YouTubeVideo> getSubscriptionVideoPage(int limit, String videoId, long beforeTimestamp) {
-        return getSubscriptionVideoPage(limit, videoId, beforeTimestamp, SubscriptionsVideosTable.COL_PUBLISH_TS);
-    }
+        SkyTubeApp.nonUiThread();
 
-    /**
-     * Query the database to retrieve number of videos for subscribed channels starting from the given video.
-     * @return a list of {@link YouTubeVideo}
-     */
-    private List<YouTubeVideo> getSubscriptionVideoPage(int limit, String videoId, long beforeTimestamp, String sortingColumn) {
         final String selection;
+        final String sortingColumn = SubscriptionsVideosTable.COL_PUBLISH_TIME.name;
         final String[] selectionArguments;
         if (videoId != null) {
             selection = "(" + sortingColumn + " < ?) OR (" + sortingColumn + " = ? AND " + SubscriptionsVideosTable.COL_YOUTUBE_VIDEO_ID + " > ?)";
@@ -659,7 +657,7 @@ public class SubscriptionsDb extends SQLiteOpenHelperEx {
             selectionArguments = null;
         }
         Cursor	cursor = getReadableDatabase().query(
-            SubscriptionsVideosTable.TABLE_NAME,
+            SubscriptionsVideosTable.TABLE_NAME_V2,
             SubscriptionsVideosTable.ALL_COLUMNS_FOR_EXTRACT,
             selection, selectionArguments, null, null,
                 sortingColumn + " DESC, " + SubscriptionsVideosTable.COL_YOUTUBE_VIDEO_ID + " ASC",
@@ -668,18 +666,14 @@ public class SubscriptionsDb extends SQLiteOpenHelperEx {
     }
 
     private Gson createGson() {
-    	return new GsonBuilder().registerTypeAdapter(YouTubeChannel.class, new JsonSerializer<YouTubeChannel>() {
-
-			@Override
-			public JsonElement serialize(YouTubeChannel src, Type typeOfSrc, JsonSerializationContext context) {
-				JsonObject obj = new JsonObject();
-				obj.addProperty("id", src.getId());
-				obj.addProperty("title", src.getTitle());
-				obj.addProperty("description", src.getDescription());
-				obj.addProperty("thumbnailNormalUrl", src.getThumbnailUrl());
-				obj.addProperty("bannerUrl", src.getBannerUrl());
-				return obj;
-			}
+    	return new GsonBuilder().registerTypeAdapter(YouTubeChannel.class, (JsonSerializer<YouTubeChannel>) (src, typeOfSrc, context) -> {
+			JsonObject obj = new JsonObject();
+			obj.addProperty("id", src.getId());
+			obj.addProperty("title", src.getTitle());
+			obj.addProperty("description", src.getDescription());
+			obj.addProperty("thumbnailNormalUrl", src.getThumbnailUrl());
+			obj.addProperty("bannerUrl", src.getBannerUrl());
+			return obj;
 		}).create();
 	}
 
@@ -690,39 +684,44 @@ public class SubscriptionsDb extends SQLiteOpenHelperEx {
      *                       maintenance queries!
      */
     private List<YouTubeVideo> extractVideos(Cursor cursor, boolean fullColumnList) {
+        SkyTubeApp.nonUiThread();
         List<YouTubeVideo> videos = new ArrayList<>();
+        Set<String> invalidIds = new HashSet<>();
         try {
 
             if (cursor.moveToNext()) {
-                final int jsonIdx = cursor.getColumnIndex(SubscriptionsVideosTable.COL_YOUTUBE_VIDEO);
-                final int retrievalIdx = fullColumnList ? cursor.getColumnIndex(SubscriptionsVideosTable.COL_RETRIEVAL_TS) : -1;
-                final int publishTsIdx = fullColumnList ? cursor.getColumnIndex(SubscriptionsVideosTable.COL_PUBLISH_TS) : -1;
+                final int idIdx = cursor.getColumnIndex(SubscriptionsVideosTable.COL_YOUTUBE_VIDEO_ID);
+                final int categoryIdx = cursor.getColumnIndex(SubscriptionsVideosTable.COL_CATEGORY_ID.name);
+                final int publishTsIdx = fullColumnList ? SubscriptionsVideosTable.COL_PUBLISH_TIME.getColumn(cursor) : -1;
+                final int publishTsExactIdx = SubscriptionsVideosTable.COL_PUBLISH_TIME_EXACT.getColumn(cursor);
+                final int titleColumn = SubscriptionsVideosTable.COL_TITLE.getColumn(cursor);
+                final int descriptionColumn = SubscriptionsVideosTable.COL_DESCRIPTION.getColumn(cursor);
+                final int durationColumn = SubscriptionsVideosTable.COL_DURATION.getColumn(cursor);
+                final int viewsColumn = SubscriptionsVideosTable.COL_VIEWS.getColumn(cursor);
+                final int likesColumn = SubscriptionsVideosTable.COL_LIKES.getColumn(cursor);
+                final int dislikesColumn = SubscriptionsVideosTable.COL_DISLIKES.getColumn(cursor);
+                final int thumbnailUrlColumn = SubscriptionsVideosTable.COL_THUMBNAIL_URL.getColumn(cursor);
+                final int channelTitleColumn = SubscriptionsVideosTable.COL_CHANNEL_TITLE.getColumn(cursor);
+                final int channelIdColumn = SubscriptionsVideosTable.COL_CHANNEL_ID_V2.getColumn(cursor);
 
                 do {
-                    final byte[] blob = cursor.getBlob(jsonIdx);
-                    final String videoJson = new String(blob);
+                    final String id = cursor.getString(idIdx);
 
-                    // convert JSON into YouTubeVideo
-                    YouTubeVideo video = gson.fromJson(videoJson, YouTubeVideo.class);
-                    if (fullColumnList) {
-                        video.setRetrievalTimestamp(cursor.getLong(retrievalIdx));
-                        video.setPublishTimestamp(cursor.getLong(publishTsIdx));
-                    }
+                    // String id, String title, String description, long durationInSeconds,
+                    //                            YouTubeChannel channel, long viewCount, Instant publishDate,
+                    //                            boolean publishDateExact, String thumbnailUrl
+                    YouTubeVideo video = new YouTubeVideo(id, cursor.getString(titleColumn), cursor.getString(descriptionColumn),
+                            cursor.getLong(durationColumn),
+                            new YouTubeChannel(cursor.getString(channelIdColumn), cursor.getString(channelTitleColumn)),
+                            cursor.getLong(viewsColumn),  
+                            Instant.ofEpochMilli(cursor.getLong(publishTsIdx)), 
+                            cursor.getInt(publishTsExactIdx) > 0,
+                            cursor.getString(thumbnailUrlColumn));
+                    video.setLikeDislikeCount(cursor.getLong(likesColumn), cursor.getLong(dislikesColumn));
+                    video.setPublishTimestamp(cursor.getLong(publishTsIdx));
+                    video.setCategoryId(getInteger(cursor, categoryIdx));
                     video.updatePublishTimestampFromDate();
 
-                    // due to upgrade to YouTubeVideo (by changing channel{Id,Name} to
-                    // YouTubeChannel)
-                    // from version 2.82 to 2.90
-                    if (video.getChannel() == null) {
-                        try {
-                            JSONObject videoJsonObj = new JSONObject(videoJson);
-                            final String channelId = videoJsonObj.get("channelId").toString();
-                            final String channelName = videoJsonObj.get("channelName").toString();
-                            video.setChannel(new YouTubeChannel(channelId, channelName));
-                        } catch (JSONException e) {
-                            Logger.e(this, "Error occurred while extracting channel{Id,Name} from JSON", e);
-                        }
-                    }
                     // regenerate the video's PublishDatePretty (e.g. 5 hours ago)
                     video.forceRefreshPublishDatePretty();
                     // add the video to the list
@@ -732,7 +731,21 @@ public class SubscriptionsDb extends SQLiteOpenHelperEx {
         } finally {
             cursor.close();
         }
+        if (!invalidIds.isEmpty()) {
+            Logger.e(this, "Found videos without channel: {}", invalidIds);
+//            deleteVideosByIds(invalidIds);
+        }
         return videos;
+    }
+
+    private void deleteVideosByIds(Set<String> ids) {
+        for (String id: ids) {
+            Logger.w(this, "delete video by id: "+ id);
+            int rowsDeleted = getWritableDatabase().delete(SubscriptionsVideosTable.TABLE_NAME_V2,
+                        SubscriptionsVideosTable.COL_YOUTUBE_VIDEO_ID + " = ?",
+                        new String[]{id});
+            Logger.w(this, "result "+rowsDeleted+" deleted");
+        }
     }
 
     // Generic channel caching
@@ -750,11 +763,11 @@ public class SubscriptionsDb extends SQLiteOpenHelperEx {
 			if (cursor.moveToNext()) {
 				String title = cursor.getString(cursor.getColumnIndexOrThrow(LocalChannelTable.COL_TITLE));
 				String description = cursor.getString(cursor.getColumnIndexOrThrow(LocalChannelTable.COL_DESCRIPTION));
-				String thumnbail = cursor.getString(cursor.getColumnIndexOrThrow(LocalChannelTable.COL_THUMBNAIL_NORMAL_URL));
+				String thumbnail = cursor.getString(cursor.getColumnIndexOrThrow(LocalChannelTable.COL_THUMBNAIL_NORMAL_URL));
 				String banner = cursor.getString(cursor.getColumnIndexOrThrow(LocalChannelTable.COL_BANNER_URL));
 				long subscriberCount = cursor.getLong(cursor.getColumnIndexOrThrow(LocalChannelTable.COL_SUBSCRIBER_COUNT));
 				long lastCheckTs = cursor.getLong(cursor.getColumnIndexOrThrow(LocalChannelTable.COL_LAST_CHECK_TS));
-				return new YouTubeChannel(channelId, title, description, thumnbail, banner, subscriberCount, false, -1, lastCheckTs);
+				return new YouTubeChannel(channelId, title, description, thumbnail, banner, subscriberCount, false, -1, lastCheckTs, null);
 			}
 		}
 		return null;
@@ -780,6 +793,7 @@ public class SubscriptionsDb extends SQLiteOpenHelperEx {
 		values.put(SubscriptionsTable.COL_THUMBNAIL_NORMAL_URL, channel.getThumbnailUrl());
 		values.put(SubscriptionsTable.COL_SUBSCRIBER_COUNT, channel.getSubscriberCount());
 		values.put(SubscriptionsTable.COL_LAST_CHECK_TIME, channel.getLastCheckTime());
+		values.put(SubscriptionsTable.COL_CATEGORY_ID.name, channel.getCategoryId());
 
 		int count = db.update(
 				SubscriptionsTable.TABLE_NAME,
@@ -843,21 +857,21 @@ public class SubscriptionsDb extends SQLiteOpenHelperEx {
 			while(cursor.moveToNext()) {
 				Long lastVisit = cursor.getLong(colLastVisit);
 				Long latestVideoTs = cursor.getLong(colLatestVideoTs);
-				boolean hasNew = (latestVideoTs != null && (lastVisit == null || latestVideoTs.longValue() > lastVisit.longValue()));
+				boolean hasNew = (latestVideoTs != null && (lastVisit == null || latestVideoTs > lastVisit));
 				result.add(new ChannelView(cursor.getString(channelId), cursor.getString(title), cursor.getString(thumbnail), hasNew));
 			}
 			return result;
 		}
 	}
 
-	private Cursor createSubscriptionCursor(String searchText, boolean sortChannelsAlphabetically) {
-		if (Utils.isEmpty(searchText)) {
-			return getReadableDatabase().rawQuery(SUBSCRIBED_CHANNEL_INFO +
-					(sortChannelsAlphabetically ? SUBSCRIBED_CHANNEL_INFO_ORDER_BY : ""), null);
-		} else {
-			return getReadableDatabase().rawQuery(SUBSCRIBED_CHANNEL_INFO + SUBSCRIBED_CHANNEL_LIMIT_BY_TITLE +
-							(sortChannelsAlphabetically ? SUBSCRIBED_CHANNEL_INFO_ORDER_BY : ""),
-					new String[]{"%"+searchText.toLowerCase()+"%"});
-		}
-	}
+    private Cursor createSubscriptionCursor(String searchText, boolean sortChannelsAlphabetically) {
+        if (Utils.isEmpty(searchText)) {
+            return getReadableDatabase().rawQuery(SUBSCRIBED_CHANNEL_INFO +
+                    (sortChannelsAlphabetically ? SUBSCRIBED_CHANNEL_INFO_ORDER_BY : ""), null);
+        } else {
+            return getReadableDatabase().rawQuery(SUBSCRIBED_CHANNEL_INFO + SUBSCRIBED_CHANNEL_LIMIT_BY_TITLE +
+                            (sortChannelsAlphabetically ? SUBSCRIBED_CHANNEL_INFO_ORDER_BY : ""),
+                    new String[]{"%" + searchText.toLowerCase() + "%"});
+        }
+    }
 }

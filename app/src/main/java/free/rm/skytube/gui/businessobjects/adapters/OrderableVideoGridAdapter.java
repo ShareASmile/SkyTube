@@ -17,8 +17,6 @@
 
 package free.rm.skytube.gui.businessobjects.adapters;
 
-import android.content.Context;
-
 import java.util.Collections;
 
 import free.rm.skytube.businessobjects.interfaces.OrderableDatabase;
@@ -27,10 +25,9 @@ import free.rm.skytube.businessobjects.interfaces.OrderableDatabase;
  * Subclass of VideoGridAdapter that supports drag & drop reordering of the items in the grid.
  */
 public class OrderableVideoGridAdapter extends VideoGridAdapter implements ItemTouchHelperAdapter {
-	private OrderableDatabase database = null;
+	private final OrderableDatabase database;
 
-	public OrderableVideoGridAdapter(Context context, OrderableDatabase database) {
-		super(context);
+	public OrderableVideoGridAdapter(OrderableDatabase database) {
 		this.database = database;
 	}
 
