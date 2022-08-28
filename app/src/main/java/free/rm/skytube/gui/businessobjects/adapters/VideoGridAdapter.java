@@ -17,13 +17,14 @@
 
 package free.rm.skytube.gui.businessobjects.adapters;
 
-import android.content.Context;
-import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Toast;
+
+import androidx.annotation.NonNull;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import java.io.IOException;
 
@@ -32,7 +33,6 @@ import free.rm.skytube.businessobjects.VideoCategory;
 import free.rm.skytube.businessobjects.YouTube.GetYouTubeVideos;
 import free.rm.skytube.businessobjects.YouTube.POJOs.CardData;
 import free.rm.skytube.businessobjects.YouTube.POJOs.YouTubeChannel;
-import free.rm.skytube.businessobjects.YouTube.POJOs.YouTubeVideo;
 import free.rm.skytube.businessobjects.YouTube.Tasks.GetYouTubeVideosTask;
 import free.rm.skytube.businessobjects.db.PlaybackStatusDb;
 import free.rm.skytube.businessobjects.interfaces.VideoPlayStatusUpdateListener;
@@ -42,6 +42,7 @@ import free.rm.skytube.gui.businessobjects.MainActivityListener;
  * An adapter that will display videos in a {@link android.widget.GridView}.
  */
 public class VideoGridAdapter extends RecyclerViewAdapterEx<CardData, GridViewHolder> implements VideoPlayStatusUpdateListener {
+
 
 	public interface Callback {
 		void onVideoGridUpdated(int newVideoListSize);
@@ -85,13 +86,17 @@ public class VideoGridAdapter extends RecyclerViewAdapterEx<CardData, GridViewHo
 
 	/**
 	 * Constructor.
-	 *
-	 * @param context	Context.
 	 */
-	public VideoGridAdapter(Context context) {
-		super(context);
+	public VideoGridAdapter() {
+		super();
 		this.getYouTubeVideos = null;
 		PlaybackStatusDb.getPlaybackStatusDb().addListener(this);
+	}
+
+	public void onDestroy() {
+		PlaybackStatusDb.getPlaybackStatusDb().removeListener(this);
+		this.listener = null;
+		this.videoGridUpdated = null;
 	}
 
 
@@ -153,9 +158,9 @@ public class VideoGridAdapter extends RecyclerViewAdapterEx<CardData, GridViewHo
 
 	@Override
 	public GridViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
-		View v = LayoutInflater.from(parent.getContext()).inflate(R.layout.video_cell, parent, false);
-		final GridViewHolder gridViewHolder = new GridViewHolder(v, listener, showChannelInfo);
-		return gridViewHolder;
+		setContext(parent.getContext());
+		View v = LayoutInflater.from(getContext()).inflate(R.layout.video_cell, parent, false);
+		return new GridViewHolder(v, listener, showChannelInfo);
 	}
 
 	/**
@@ -195,10 +200,8 @@ public class VideoGridAdapter extends RecyclerViewAdapterEx<CardData, GridViewHo
 
 
 	@Override
-	public void onBindViewHolder(GridViewHolder viewHolder, int position) {
-		if (viewHolder != null) {
-			viewHolder.updateInfo(get(position), getContext(), listener);
-		}
+	public void onBindViewHolder(@NonNull GridViewHolder viewHolder, int position) {
+		viewHolder.updateInfo(get(position), getContext(), listener);
 
 		// if it reached the bottom of the list, then try to get the next page of videos
 		if (position >= getItemCount() - 1) {
@@ -206,9 +209,12 @@ public class VideoGridAdapter extends RecyclerViewAdapterEx<CardData, GridViewHo
 			if(getYouTubeVideos != null)
 				new GetYouTubeVideosTask(getYouTubeVideos, this, swipeRefreshLayout, false, videoGridUpdated).executeInParallel();
 		}
-
 	}
 
+	@Override
+	public void onViewRecycled(@NonNull GridViewHolder holder) {
+		holder.clearBackgroundTasks();
+	}
 
 	public void setSwipeRefreshLayout(SwipeRefreshLayout swipeRefreshLayout) {
 		this.swipeRefreshLayout = swipeRefreshLayout;

@@ -19,15 +19,14 @@ package free.rm.skytube.gui.businessobjects;
 
 import android.content.Context;
 import android.content.Intent;
-import androidx.annotation.NonNull;
-import androidx.recyclerview.widget.RecyclerView;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
 
-import com.afollestad.materialdialogs.DialogAction;
-import com.afollestad.materialdialogs.MaterialDialog;
+import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.RecyclerView;
+
 import com.google.common.collect.Lists;
 
 import java.text.NumberFormat;
@@ -38,8 +37,6 @@ import free.rm.skytube.app.SkyTubeApp;
 import free.rm.skytube.businessobjects.YouTube.VideoBlocker;
 import free.rm.skytube.gui.activities.PreferencesActivity;
 import free.rm.skytube.gui.fragments.preferences.VideoBlockerPreferenceFragment;
-
-import static android.preference.PreferenceActivity.EXTRA_SHOW_FRAGMENT;
 
 /**
  * A dialog that displays a list of blocked videos.
@@ -80,11 +77,10 @@ public class BlockedVideosDialog extends SkyTubeMaterialDialog {
 			// display the PreferenceActivity where the Videos Blocker tab is selected/opened
 			// by default
 			final Intent i = new Intent(context, PreferencesActivity.class);
-			i.putExtra(EXTRA_SHOW_FRAGMENT, VideoBlockerPreferenceFragment.class.getName());
+			i.putExtra(PreferencesActivity.START_FRAGMENT, VideoBlockerPreferenceFragment.class.getName());
 			context.startActivity(i);
 		});
 	}
-
 
 	////////////////////////////////////////////////////////////////////////////////////////////////
 

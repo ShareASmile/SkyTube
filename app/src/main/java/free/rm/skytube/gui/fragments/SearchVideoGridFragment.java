@@ -18,16 +18,17 @@
 package free.rm.skytube.gui.fragments;
 
 import android.os.Bundle;
-import androidx.annotation.Nullable;
-import androidx.appcompat.app.ActionBar;
-import androidx.appcompat.widget.SearchView;
-import androidx.appcompat.widget.Toolbar;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+
+import androidx.annotation.Nullable;
+import androidx.appcompat.app.ActionBar;
+import androidx.appcompat.widget.SearchView;
+import androidx.appcompat.widget.Toolbar;
 
 import free.rm.skytube.R;
 import free.rm.skytube.businessobjects.VideoCategory;
@@ -70,13 +71,10 @@ public class SearchVideoGridFragment extends VideosGridFragment {
 			actionBar.setTitle(searchQuery);
 
 		//makes searched query editable on long press
-		toolbar.setOnLongClickListener(new View.OnLongClickListener() {
-			@Override
-			public boolean onLongClick(View view) {
-				editSearchView.setIconified(false);
-				editSearchView.setQuery(searchQuery,false);
-				return false;
-			}
+		toolbar.setOnLongClickListener(view1 -> {
+			editSearchView.setIconified(false);
+			editSearchView.setQuery(searchQuery,false);
+			return false;
 		});
 		// the app will call onCreateOptionsMenu() for when the user wants to search
 		setHasOptionsMenu(true);
@@ -136,4 +134,8 @@ public class SearchVideoGridFragment extends VideosGridFragment {
 		return null;
 	}
 
+	@Override
+	public int getPriority() {
+		return 0;
+	}
 }

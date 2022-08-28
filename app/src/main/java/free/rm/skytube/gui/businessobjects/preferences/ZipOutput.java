@@ -16,13 +16,13 @@
  */
 package free.rm.skytube.gui.businessobjects.preferences;
 
-import android.os.Build;
 import android.util.Log;
 
 import org.apache.commons.codec.Charsets;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
+import java.io.Closeable;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -31,15 +31,13 @@ import java.io.IOException;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
-// @RequiresApi(api = Build.VERSION_CODES.KITKAT)
-public class ZipOutput { // implements AutoCloseable {
+public class ZipOutput implements Closeable {
     private static final String TAG = ZipOutput.class.getSimpleName();
-    private final File zipFilePath;
 
     private static final int BUFFER_SIZE = 2048;
-    private FileOutputStream dest;
-    private ZipOutputStream outputZipStream;
-    byte[]              buffer            = new byte[BUFFER_SIZE];
+    private final FileOutputStream dest;
+    private final ZipOutputStream outputZipStream;
+    private final byte[] buffer = new byte[BUFFER_SIZE];
 
     /**
      * Constructor.
@@ -47,24 +45,22 @@ public class ZipOutput { // implements AutoCloseable {
      * @param zipFilePath   The zip file.
      */
     public ZipOutput(File zipFilePath) throws FileNotFoundException {
-        this.zipFilePath = zipFilePath;
         this.dest            = new FileOutputStream(zipFilePath);
         this.outputZipStream = new ZipOutputStream(new BufferedOutputStream(dest));
     }
 
     public void addFile(String path) throws IOException {
-        FileInputStream fi = new FileInputStream(path);
-        BufferedInputStream origin = new BufferedInputStream(fi, BUFFER_SIZE);
-        ZipEntry entry = new ZipEntry(path.substring(path.lastIndexOf("/") + 1));
+        try (FileInputStream fi = new FileInputStream(path);
+             BufferedInputStream origin = new BufferedInputStream(fi, BUFFER_SIZE)) {
+            ZipEntry entry = new ZipEntry(path.substring(path.lastIndexOf("/") + 1));
 
-        outputZipStream.putNextEntry(entry);
+            outputZipStream.putNextEntry(entry);
 
-        int count;
-        while ((count = origin.read(buffer, 0, BUFFER_SIZE)) != -1) {
-            outputZipStream.write(buffer, 0, count);
+            int count;
+            while ((count = origin.read(buffer, 0, BUFFER_SIZE)) != -1) {
+                outputZipStream.write(buffer, 0, count);
+            }
         }
-        origin.close();
-        fi.close();
 
         Log.d(TAG, "Added: " + path);
     }
@@ -78,7 +74,7 @@ public class ZipOutput { // implements AutoCloseable {
         Log.d(TAG, "Added: " + name);
     }
 
-    // @Override
+    @Override
     public void close() throws IOException {
         outputZipStream.close();
         dest.close();

@@ -6,6 +6,8 @@ import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.net.Uri;
 
+import androidx.annotation.NonNull;
+
 import com.google.gson.Gson;
 
 import org.json.JSONException;
@@ -13,7 +15,9 @@ import org.json.JSONObject;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import free.rm.skytube.app.SkyTubeApp;
 import free.rm.skytube.businessobjects.AsyncTaskParallel;
@@ -27,11 +31,14 @@ import free.rm.skytube.businessobjects.interfaces.OrderableDatabase;
  * A database (DB) that stores user's downloaded videos.
  */
 public class DownloadedVideosDb extends SQLiteOpenHelperEx implements OrderableDatabase {
+
 	public static class Status {
 		final Uri uri;
+		final Uri audioUri;
 		final boolean disapeared;
-		public Status(Uri uri, boolean disapeared) {
+		public Status(Uri uri, Uri audioUri, boolean disapeared) {
 			this.uri = uri;
+			this.audioUri = audioUri;
 			this.disapeared = disapeared;
 		}
 
@@ -39,17 +46,26 @@ public class DownloadedVideosDb extends SQLiteOpenHelperEx implements OrderableD
 			return uri;
 		}
 
+		public Uri getAudioUri() {
+			return audioUri;
+		}
+
 		public boolean isDisapeared() {
 			return disapeared;
 		}
 	}
+
+	public interface DownloadedVideosListener {
+		void onDownloadedVideosUpdated();
+	}
+
 	private static volatile DownloadedVideosDb downloadsDb = null;
 	private static boolean hasUpdated = false;
 
 	private static final int DATABASE_VERSION = 1;
 	private static final String DATABASE_NAME = "videodownloads.db";
 
-	private DownloadedVideosListener listener;
+	private final Set<DownloadedVideosListener> listeners = new HashSet<>();
 
 	public static synchronized DownloadedVideosDb getVideoDownloadsDb() {
 		if (downloadsDb == null) {
@@ -179,23 +195,17 @@ public class DownloadedVideosDb extends SQLiteOpenHelperEx implements OrderableD
 	}
 
 	public Uri getVideoFileUri(String videoId) {
-		Cursor cursor = null;
-		try {
-			cursor = getReadableDatabase().query(
-					DownloadedVideosTable.TABLE_NAME,
-					new String[]{DownloadedVideosTable.COL_FILE_URI},
-					DownloadedVideosTable.COL_YOUTUBE_VIDEO_ID + " = ?",
-					new String[]{videoId}, null, null, null);
+		try (Cursor cursor = getReadableDatabase().query(
+				DownloadedVideosTable.TABLE_NAME,
+				new String[]{DownloadedVideosTable.COL_FILE_URI},
+				DownloadedVideosTable.COL_YOUTUBE_VIDEO_ID + " = ?",
+				new String[]{videoId}, null, null, null)) {
 
 			if (cursor.moveToNext()) {
 				String uri = cursor.getString(cursor.getColumnIndex(DownloadedVideosTable.COL_FILE_URI));
 				return Uri.parse(uri);
 			}
 			return null;
-		} finally {
-			if (cursor != null) {
-				cursor.close();
-			}
 		}
 	}
 
@@ -210,25 +220,39 @@ public class DownloadedVideosDb extends SQLiteOpenHelperEx implements OrderableD
 			File file = new File(uri.getPath());
 			if (!file.exists()) {
 				remove(videoId);
-				return new Status(null, true);
+				return new Status(null, null, true);
 			}
-			return new Status(uri, false);
+			return new Status(uri,  null,false);
 		}
-		return new Status(null, false);
+		return new Status(null,null, false);
 	}
 
-	private void onUpdated() {
+	private synchronized void onUpdated() {
 		hasUpdated = true;
-		if(listener != null)
-			listener.onDownloadedVideosUpdated();
+		if(listeners != null) {
+			for (DownloadedVideosListener listener: listeners) {
+				listener.onDownloadedVideosUpdated();
+			}
+		}
 	}
 
-	public interface DownloadedVideosListener {
-		void onDownloadedVideosUpdated();
+	/**
+	 * Add a Listener that will be notified when a video is added or removed from the Downloaded Videos. This will
+	 * allow the Video Grid to be redrawn in order to remove the video from display.
+	 *
+	 * @param listener The Listener (which implements DownloadedVideosListener) to add.
+	 */
+	public synchronized void addListener(@NonNull DownloadedVideosListener listener) {
+		this.listeners.add(listener);
 	}
 
-	public void setListener(DownloadedVideosListener listener) {
-		this.listener = listener;
+	/**
+	 * Remove the Listener
+	 *
+	 * @param listener The Listener (which implements BookmarksDbListener) to remove.
+	 */
+	public synchronized void removeListener(@NonNull DownloadedVideosListener listener) {
+		this.listeners.remove(listener);
 	}
 
 	/**

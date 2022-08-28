@@ -22,7 +22,6 @@ import android.content.DialogInterface;
 
 import androidx.annotation.NonNull;
 
-import com.afollestad.materialdialogs.DialogAction;
 import com.afollestad.materialdialogs.MaterialDialog;
 
 import free.rm.skytube.R;
@@ -36,7 +35,7 @@ public class SkyTubeMaterialDialog extends MaterialDialog.Builder {
 		super(context);
 
 		titleColorRes(R.color.dialog_title);
-		backgroundColorRes(R.color.dialog_backgound);
+		backgroundColorRes(R.color.dialog_background);
 		contentColorRes(R.color.dialog_content_text);
 		positiveColorRes(R.color.dialog_positive_text);
 		negativeColorRes(R.color.dialog_negative_text);

@@ -1,10 +1,11 @@
 package free.rm.skytube.gui.fragments;
 
 import android.os.Bundle;
-import androidx.annotation.Nullable;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+
+import androidx.annotation.Nullable;
 
 import free.rm.skytube.R;
 import free.rm.skytube.app.SkyTubeApp;
@@ -29,8 +30,9 @@ public class ChannelVideosFragment extends VideosGridFragment {
 		// create and return the view
 		View view =  super.onCreateView(inflater, container, savedInstanceState);
 
-		if (channel != null)
+		if (channel != null) {
 			videoGridAdapter.setYouTubeChannel(channel);
+		}
 
 		return view;
 	}
@@ -38,7 +40,9 @@ public class ChannelVideosFragment extends VideosGridFragment {
 
 	public void setYouTubeChannel(YouTubeChannel youTubeChannel) {
 		channel = youTubeChannel;
-		videoGridAdapter.setYouTubeChannel(youTubeChannel);
+		if (videoGridAdapter != null) {
+			videoGridAdapter.setYouTubeChannel(youTubeChannel);
+		}
 	}
 
 
@@ -64,5 +68,8 @@ public class ChannelVideosFragment extends VideosGridFragment {
 		return SkyTubeApp.getStr(R.string.videos);
 	}
 
-
+	@Override
+	public int getPriority() {
+		return 0;
+	}
 }

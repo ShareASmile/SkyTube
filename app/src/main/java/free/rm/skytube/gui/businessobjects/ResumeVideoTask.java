@@ -17,6 +17,7 @@
 package free.rm.skytube.gui.businessobjects;
 
 import android.content.Context;
+
 import androidx.annotation.NonNull;
 
 import free.rm.skytube.R;
@@ -29,7 +30,7 @@ import free.rm.skytube.businessobjects.db.PlaybackStatusDb;
  */
 public class ResumeVideoTask {
 
-    public static interface Callback {
+    public interface Callback {
         void loadVideo(int position);
     }
 

@@ -18,7 +18,6 @@
 package free.rm.skytube.gui.businessobjects.adapters;
 
 import android.content.Context;
-import androidx.recyclerview.widget.RecyclerView;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -26,15 +25,20 @@ import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+import androidx.recyclerview.widget.RecyclerView;
+
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.request.RequestOptions;
 
+import java.util.HashSet;
 import java.util.Iterator;
+import java.util.Set;
 
 import free.rm.skytube.R;
 import free.rm.skytube.businessobjects.YouTube.POJOs.ChannelView;
-import free.rm.skytube.businessobjects.db.Tasks.GetSubscribedChannelViewTask;
+import free.rm.skytube.businessobjects.db.DatabaseTasks;
 import free.rm.skytube.gui.businessobjects.MainActivityListener;
+import io.reactivex.rxjava3.disposables.CompositeDisposable;
 
 /**
  * Channel subscriptions adapter: Contains a list of channels (that the user subscribed to) together
@@ -44,16 +48,17 @@ public class SubsAdapter extends RecyclerViewAdapterEx<ChannelView, SubsAdapter.
 
 	private static final String TAG = SubsAdapter.class.getSimpleName();
 	private static SubsAdapter subsAdapter = null;
-	private MainActivityListener listener;
+	private final Set<MainActivityListener> listeners = new HashSet<>();
 
 	private String searchText;
+
+	private final CompositeDisposable compositeDisposable = new CompositeDisposable();
 
 	private SubsAdapter(Context context, View progressBar) {
 		super(context);
 
 		// populate this adapter with user's subscribed channels
 		executeQuery(null, progressBar);
-
 	}
 
 	public static SubsAdapter get(Context context) {
@@ -68,8 +73,12 @@ public class SubsAdapter extends RecyclerViewAdapterEx<ChannelView, SubsAdapter.
 		return subsAdapter;
 	}
 
-	public void setListener(MainActivityListener listener) {
-		this.listener = listener;
+	public void addListener(MainActivityListener listener) {
+		this.listeners.add(listener);
+	}
+
+	public void removeListener(MainActivityListener listener) {
+		this.listeners.remove(listener);
 	}
 
 	/**
@@ -148,9 +157,8 @@ public class SubsAdapter extends RecyclerViewAdapterEx<ChannelView, SubsAdapter.
 	}
 
 	private void executeQuery(String searchText, View progressBar) {
-		new GetSubscribedChannelViewTask(searchText, progressBar, channelViews -> {
-			appendList(channelViews);
-		}).executeInParallel();
+		compositeDisposable.add(DatabaseTasks.getSubscribedChannelView(progressBar, searchText)
+				.subscribe(this::appendList));
 	}
 
 	public void filterSubSearch(String searchText){
@@ -175,13 +183,14 @@ public class SubsAdapter extends RecyclerViewAdapterEx<ChannelView, SubsAdapter.
 			channel = null;
 
 			rowView.setOnClickListener(v -> {
-				if (listener instanceof MainActivityListener)
+				for (MainActivityListener listener: listeners) {
 					listener.onChannelClick(channel.getId());
+				}
 			});
 		}
 
 		void updateInfo(ChannelView channel) {
-			Glide.with(getContext().getApplicationContext())
+			Glide.with(itemView.getContext().getApplicationContext())
 					.load(channel.getThumbnailUrl())
 					.apply(new RequestOptions().placeholder(R.drawable.channel_thumbnail_default))
 					.into(thumbnailImageView);

@@ -31,7 +31,6 @@ import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
@@ -90,18 +89,16 @@ public class BackupDatabases {
 		channelFilteringDb.close();
 		searchHistoryDb.close();
 
-		ZipOutput databasesZip = new ZipOutput(backupPath);
+		try (ZipOutput databasesZip = new ZipOutput(backupPath)) {
+			// backup the databases inside a zip file
+			databasesZip.addFile(subscriptionsDb.getDatabasePath());
+			databasesZip.addFile(bookmarksDb.getDatabasePath());
+			databasesZip.addFile(playbackDb.getDatabasePath());
+			databasesZip.addFile(channelFilteringDb.getDatabasePath());
+			databasesZip.addFile(searchHistoryDb.getDatabasePath());
 
-		// backup the databases inside a zip file
-		databasesZip.addFile(subscriptionsDb.getDatabasePath());
-		databasesZip.addFile(bookmarksDb.getDatabasePath());
-		databasesZip.addFile(playbackDb.getDatabasePath());
-		databasesZip.addFile(channelFilteringDb.getDatabasePath());
-		databasesZip.addFile(searchHistoryDb.getDatabasePath());
-
-		databasesZip.addContent(PREFERENCES_JSON, gson.toJson(getImportantKeys()));
-
-		databasesZip.close();
+			databasesZip.addContent(PREFERENCES_JSON, gson.toJson(getImportantKeys()));
+		}
 		return backupPath.getPath();
 	}
 

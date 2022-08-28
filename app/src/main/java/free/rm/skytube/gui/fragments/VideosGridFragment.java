@@ -18,12 +18,13 @@
 package free.rm.skytube.gui.fragments;
 
 import android.os.Bundle;
-import androidx.recyclerview.widget.GridLayoutManager;
-import androidx.recyclerview.widget.RecyclerView;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.GridView;
+
+import androidx.recyclerview.widget.GridLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import com.bumptech.glide.Glide;
 
@@ -31,7 +32,6 @@ import butterknife.BindView;
 import free.rm.skytube.R;
 import free.rm.skytube.businessobjects.VideoCategory;
 import free.rm.skytube.gui.businessobjects.MainActivityListener;
-import free.rm.skytube.gui.businessobjects.adapters.VideoGridAdapter;
 import free.rm.skytube.gui.businessobjects.fragments.BaseVideosGridFragment;
 
 /**
@@ -43,10 +43,6 @@ public abstract class VideosGridFragment extends BaseVideosGridFragment {
 	protected RecyclerView	gridView;
 
 	public VideosGridFragment() {
-		super(new VideoGridAdapter(null));
-	}
-	public VideosGridFragment(VideoGridAdapter videoGrid) {
-		super(videoGrid);
 	}
 
 	@Override
@@ -57,8 +53,9 @@ public abstract class VideosGridFragment extends BaseVideosGridFragment {
 		// setup the video grid view
 		videoGridAdapter.setSwipeRefreshLayout(swipeRefreshLayout);
 
-		if (getVideoCategory() != null)
-			videoGridAdapter.setVideoCategory(getVideoCategory(), getSearchString());
+		VideoCategory category = getVideoCategory();
+		if (category != null)
+			videoGridAdapter.setVideoCategory(category, getSearchString());
 
 		videoGridAdapter.setListener((MainActivityListener)getActivity());
 
@@ -66,17 +63,15 @@ public abstract class VideosGridFragment extends BaseVideosGridFragment {
 		gridView.setLayoutManager(new GridLayoutManager(getActivity(), getResources().getInteger(R.integer.video_grid_num_columns)));
 		gridView.setAdapter(videoGridAdapter);
 
-		// The fragment is already selected, we need to initialize the video grid
-		if (this.isFragmentSelected()) {
-			videoGridAdapter.initializeList();
-		}
 		return view;
 	}
 
 
 	@Override
-	public void onDestroy() {
-		super.onDestroy();
+	public void onDestroyView() {
+		gridView.setAdapter(null);
+		videoGridAdapter.onDestroy();
+		super.onDestroyView();
 		Glide.get(getActivity()).clearMemory();
 	}
 
@@ -106,4 +101,9 @@ public abstract class VideosGridFragment extends BaseVideosGridFragment {
 	 */
 	public abstract String getFragmentName();
 
+	public abstract int getPriority();
+
+	public String getBundleKey() {
+		return null;
+	}
 }

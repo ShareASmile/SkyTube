@@ -2,15 +2,15 @@ package free.rm.skytube.gui.fragments;
 
 import android.content.Intent;
 import android.os.Bundle;
-import androidx.appcompat.app.ActionBar;
-import androidx.appcompat.widget.Toolbar;
-
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
+
+import androidx.appcompat.app.ActionBar;
+import androidx.appcompat.widget.Toolbar;
 
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.request.RequestOptions;
@@ -102,7 +102,12 @@ public class PlaylistVideosFragment extends VideosGridFragment {
 
 	@Override
 	protected VideoCategory getVideoCategory() {
-		return youTubePlaylist.getChannelTitle() != null ? VideoCategory.PLAYLIST_VIDEOS : VideoCategory.MIXED_PLAYLIST_VIDEOS;
+		// This can be called, when there is no youtubePlaylist object.
+		if (youTubePlaylist == null) {
+			return null;
+		} else {
+			return youTubePlaylist.getChannelTitle() != null ? VideoCategory.PLAYLIST_VIDEOS : VideoCategory.MIXED_PLAYLIST_VIDEOS;
+		}
 	}
 
 
@@ -111,4 +116,8 @@ public class PlaylistVideosFragment extends VideosGridFragment {
 		return youTubePlaylist.getId();
 	}
 
+	@Override
+	public int getPriority() {
+		return 0;
+	}
 }

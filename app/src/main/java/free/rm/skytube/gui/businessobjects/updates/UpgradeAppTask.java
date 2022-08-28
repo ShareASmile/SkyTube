@@ -21,14 +21,14 @@ import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
-import androidx.core.content.FileProvider;
 import android.util.Log;
 import android.util.Pair;
 import android.widget.Toast;
 
+import androidx.core.content.FileProvider;
+
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.URL;
@@ -118,33 +118,27 @@ public class UpgradeAppTask extends AsyncTaskParallel<Void, Integer, Pair<File, 
 	 * @throws IOException
 	 */
 	private File downloadApk() throws IOException {
-		WebStream       webStream = new WebStream(this.apkUrl);
-		File            apkFile   = File.createTempFile("skytube-upgrade", ".apk", apkDir);
-		OutputStream    out;
+		try (WebStream webStream = new WebStream(this.apkUrl)) {
+			File apkFile = File.createTempFile("skytube-upgrade", ".apk", apkDir);
 
-		// set the APK file to readable to every user so that this file can be read by Android's
-		// package manager program
-		apkFile.setReadable(true /*set file to readable*/, false /*set readable to every user on the system*/);
-		out = new FileOutputStream(apkFile);
+			// set the APK file to readable to every user so that this file can be read by Android's
+			// package manager program
+			apkFile.setReadable(true /*set file to readable*/, false /*set readable to every user on the system*/);
+			try (OutputStream out = new FileOutputStream(apkFile)) {
+				byte[] buf = new byte[1024];
+				int totalBytesRead = 0;
+				for (int bytesRead; (bytesRead = webStream.getStream().read(buf)) > 0; ) {
+					out.write(buf, 0, bytesRead);
 
-		// download the file by transferring bytes from in to out
-		byte[]	buf = new byte[1024];
-		int		totalBytesRead = 0;
-		for (int bytesRead; (bytesRead = webStream.getStream().read(buf)) > 0; ) {
-			out.write(buf, 0, bytesRead);
+					// update the progressbar of the downloadDialog
+					totalBytesRead += bytesRead;
+					publishProgress(totalBytesRead, webStream.getStreamSize());
+				}
+			}
 
-			// update the progressbar of the downloadDialog
-			totalBytesRead += bytesRead;
-			publishProgress(totalBytesRead, webStream.getStreamSize());
+			return apkFile;
 		}
-
-		// close the streams
-		webStream.getStream().close();
-		out.close();
-
-		return apkFile;
 	}
-
 
 	@Override
 	protected void onProgressUpdate(Integer... values) {
@@ -154,7 +148,6 @@ public class UpgradeAppTask extends AsyncTaskParallel<Void, Integer, Pair<File, 
 
 		downloadDialog.setProgress((int)percentageDownloaded);
 	}
-
 
 	@Override
 	protected void onPostExecute(Pair<File, Throwable> out) {

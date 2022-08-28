@@ -20,14 +20,11 @@ import org.schabi.newpipe.extractor.InfoItem;
 import org.schabi.newpipe.extractor.ListExtractor;
 import org.schabi.newpipe.extractor.StreamingService;
 import org.schabi.newpipe.extractor.channel.ChannelInfoItem;
-import org.schabi.newpipe.extractor.exceptions.ExtractionException;
 import org.schabi.newpipe.extractor.exceptions.ParsingException;
-import org.schabi.newpipe.extractor.linkhandler.LinkHandler;
 import org.schabi.newpipe.extractor.linkhandler.LinkHandlerFactory;
 import org.schabi.newpipe.extractor.playlist.PlaylistInfoItem;
 import org.schabi.newpipe.extractor.stream.StreamInfoItem;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -40,16 +37,10 @@ import free.rm.skytube.businessobjects.YouTube.POJOs.YouTubePlaylist;
 import free.rm.skytube.businessobjects.YouTube.POJOs.YouTubeVideo;
 
 public class VideoPager extends Pager<InfoItem, CardData> {
-    private final YouTubeChannel channel;
     private final Set<String> seenVideos = new HashSet<>();
 
-    public VideoPager(StreamingService streamingService, ListExtractor<InfoItem> channelExtractor, YouTubeChannel channel) {
+    public VideoPager(StreamingService streamingService, ListExtractor<InfoItem> channelExtractor) {
         super(streamingService, channelExtractor);
-        this.channel = channel;
-    }
-
-    public YouTubeChannel getChannel() {
-        return channel;
     }
 
     @Override
@@ -103,12 +94,12 @@ public class VideoPager extends Pager<InfoItem, CardData> {
         return result;
     }
 
-    private YouTubeVideo convert(StreamInfoItem item, String id) {
+    protected YouTubeVideo convert(StreamInfoItem item, String id) {
         NewPipeService.DateInfo date = new NewPipeService.DateInfo(item.getUploadDate());
         Logger.i(this, "item %s, title=%s at %s", id, item.getName(), date);
-        YouTubeChannel ch = channel != null ? channel : new YouTubeChannel(item.getUploaderUrl(), item.getUploaderName());
+        YouTubeChannel ch = new YouTubeChannel(item.getUploaderUrl(), item.getUploaderName());
         return new YouTubeVideo(id, item.getName(), null, item.getDuration(), ch,
-                item.getViewCount(), date.timestamp, date.exact, NewPipeService.getThumbnailUrl(id));
+                item.getViewCount(), date.zonedDateTime, date.exact, NewPipeService.getThumbnailUrl(id));
     }
 
     private CardData convert(PlaylistInfoItem playlistInfoItem, String id) {

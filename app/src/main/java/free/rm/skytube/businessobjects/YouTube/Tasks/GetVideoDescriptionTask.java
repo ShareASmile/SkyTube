@@ -17,9 +17,9 @@
 
 package free.rm.skytube.businessobjects.YouTube.Tasks;
 
-import java.io.IOException;
-
 import org.schabi.newpipe.extractor.exceptions.ExtractionException;
+
+import java.io.IOException;
 
 import free.rm.skytube.R;
 import free.rm.skytube.app.SkyTubeApp;
@@ -65,8 +65,7 @@ public class GetVideoDescriptionTask extends AsyncTaskParallel<Void, Void, Strin
 
 	private YouTubeVideo getDetails() {
 		try {
-			YouTubeVideo details = NewPipeService.get().getDetails(youTubeVideo.getId());
-			return details;
+			return NewPipeService.get().getDetails(youTubeVideo.getId());
 		} catch (ExtractionException | IOException e) {
 			Logger.e(this, "Unable to get video details, where id=" + youTubeVideo.getId(), e);
 			return null;
