@@ -11,6 +11,7 @@
   <a href="#why-skytube">Why SkyTube?</a> | 
   <a href="#screenshots">Screenshots</a> | 
   <a href="#contribute">Contribute</a> | 
+  <a href="#translate">Translate</a> | 
   <a href="#license">License</a>
 </p>
 
@@ -56,7 +57,7 @@ Android 4.0 (Ice Cream Sandwich) or later. For techies, that means an API level 
 | Official YouTube player support* | ✅                   | ❌       |
 | Chromecast Support*              | ✅                   | ❌       |
 | Updates availability             | Immediate            | Normally up to 5 days |
-| Download APK                     | [![Download SkyTube Extra APK](screenshots/download_apk.png)](https://github.com/ram-on/SkyTube/releases/download/v2.973/SkyTube-Extra-2.973.apk) | [![Download SkyTube (Vanilla) APK](https://upload.wikimedia.org/wikipedia/commons/thumb/0/0d/Get_it_on_F-Droid.svg/200px-Get_it_on_F-Droid.svg.png)](https://f-droid.org/repository/browse/?fdid=free.rm.skytube.oss)
+| Download APK                     | [![Download SkyTube Extra APK](screenshots/download_apk.png)](https://github.com/ram-on/SkyTube/releases/download/v2.976/SkyTube-Extra-2.976.apk) | [![Download SkyTube (Vanilla) APK](https://upload.wikimedia.org/wikipedia/commons/thumb/0/0d/Get_it_on_F-Droid.svg/200px-Get_it_on_F-Droid.svg.png)](https://f-droid.org/repository/browse/?fdid=free.rm.skytube.oss)
 
 _* powered by a closed-source, third-party library._
 
@@ -68,6 +69,15 @@ _* powered by a closed-source, third-party library._
 * Not dependent on GAPPS/Google Apps (i.e. YouTube official app)
 * No need for Google/YouTube account to operate
 * My code does not spy on your behaviour!
+
+## Translate
+You can help us translate this app into your native language by visiting [SkyTube's Weblate page](https://hosted.weblate.org/engage/skytube/).  Just log in using your GitHub/GitLab/BitBucket/Google/Facebook account and start translating!
+
+### Translation status:
+<a href="https://hosted.weblate.org/engage/skytube/?utm_source=widget">
+<img src="https://hosted.weblate.org/widgets/skytube/-/multi-auto.svg" alt="Translation status" />
+</a>
+
 
 ## Screenshots
 ### Phone

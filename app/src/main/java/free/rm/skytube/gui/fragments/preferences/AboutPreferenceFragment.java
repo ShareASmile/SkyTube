@@ -20,35 +20,31 @@ package free.rm.skytube.gui.fragments.preferences;
 import android.app.AlertDialog;
 import android.app.ProgressDialog;
 import android.content.Intent;
-import android.content.pm.ApplicationInfo;
 import android.net.Uri;
 import android.os.Bundle;
-import android.preference.Preference;
-import android.preference.PreferenceFragment;
 import android.util.Log;
 import android.webkit.WebChromeClient;
 import android.webkit.WebView;
 
-import java.io.File;
+import androidx.preference.Preference;
+import androidx.preference.PreferenceFragmentCompat;
+
 import java.text.SimpleDateFormat;
 import java.util.Locale;
 
 import free.rm.skytube.BuildConfig;
 import free.rm.skytube.R;
-import free.rm.skytube.app.SkyTubeApp;
 import free.rm.skytube.gui.businessobjects.SkyTubeMaterialDialog;
 import free.rm.skytube.gui.businessobjects.updates.UpdatesCheckerTask;
 
 /**
  * Preference fragment for about (this app) related settings.
  */
-public class AboutPreferenceFragment extends PreferenceFragment {
-
+public class AboutPreferenceFragment extends PreferenceFragmentCompat {
 	private static final String TAG = AboutPreferenceFragment.class.getSimpleName();
 
 	@Override
-	public void onCreate(Bundle savedInstanceState) {
-		super.onCreate(savedInstanceState);
+	public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
 		addPreferencesFromResource(R.xml.preference_about);
 
 		// set the app's version number
@@ -92,7 +88,6 @@ public class AboutPreferenceFragment extends PreferenceFragment {
 		});
 	}
 
-
 	/**
 	 * @return The app's version number.
 	 */
@@ -112,8 +107,6 @@ public class AboutPreferenceFragment extends PreferenceFragment {
 		return ver.toString();
 	}
 
-
-
 	/**
 	 * @return App's build timestamp.
 	 */
@@ -128,10 +121,7 @@ public class AboutPreferenceFragment extends PreferenceFragment {
 		}
 
 		return timeStamp;
-
 	}
-
-
 
 	/**
 	 * Displays the credits (i.e. contributors).
@@ -164,8 +154,6 @@ public class AboutPreferenceFragment extends PreferenceFragment {
 				.show();
 	}
 
-
-
 	/**
 	 * Displays the app's license in an AlertDialog.
 	 */
@@ -176,5 +164,4 @@ public class AboutPreferenceFragment extends PreferenceFragment {
 				.setCancelable(false)	// do not allow the user to click outside the dialog or press the back button
 				.show();
 	}
-
 }

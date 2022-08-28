@@ -1,11 +1,12 @@
 package free.rm.skytube.gui.fragments;
 
 import android.os.Bundle;
-import androidx.annotation.Nullable;
-import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+
+import androidx.annotation.Nullable;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import free.rm.skytube.R;
 import free.rm.skytube.app.SkyTubeApp;
@@ -72,4 +73,8 @@ public class ChannelPlaylistsFragment extends VideosGridFragment implements Play
 		return null;
 	}
 
+	@Override
+	public int getPriority() {
+		return 6;
+	}
 }

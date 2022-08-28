@@ -41,15 +41,12 @@ import free.rm.skytube.businessobjects.YouTube.POJOs.YouTubeComment;
 import free.rm.skytube.businessobjects.YouTube.POJOs.YouTubeCommentThread;
 import free.rm.skytube.businessobjects.YouTube.newpipe.NewPipeService;
 import free.rm.skytube.businessobjects.YouTube.newpipe.PagerBackend;
-import free.rm.skytube.businessobjects.db.Tasks.GetChannelInfo;
-import free.rm.skytube.gui.businessobjects.YouTubePlayer;
 
 /**
  * An adapter that will display comments in an {@link ExpandableListView}.
  */
 public class CommentsAdapter extends BaseExpandableListAdapter {
 
-	private final String				videoId;
 	private PagerBackend<YouTubeCommentThread> commentThreadPager;
 	private List<YouTubeCommentThread>	commentThreadsList = new ArrayList<>();
 	private GetCommentsTask				getCommentsTask = null;
@@ -64,7 +61,6 @@ public class CommentsAdapter extends BaseExpandableListAdapter {
 
 	public CommentsAdapter(Context context, String videoId, ExpandableListView expandableListView, View commentsProgressBar, View noVideoCommentsView) {
 		this.context = context;
-		this.videoId = videoId;
 		this.expandableListView = expandableListView;
 		this.expandableListView.setAdapter(this);
 		this.expandableListView.setOnGroupClickListener((parent, v, groupPosition, id) -> true);

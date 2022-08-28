@@ -32,7 +32,9 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import free.rm.skytube.app.SkyTubeApp;
 import free.rm.skytube.app.Utils;
@@ -53,8 +55,7 @@ public class BookmarksDb extends SQLiteOpenHelperEx implements OrderableDatabase
 	private static final int DATABASE_VERSION = 1;
 	private static final String DATABASE_NAME = "bookmarks.db";
 
-	private List<BookmarksDbListener> listeners = new ArrayList<>();
-
+	private final Set<BookmarksDbListener> listeners = new HashSet<>();
 
 	private BookmarksDb(Context context) {
 		super(context, DATABASE_NAME, null, DATABASE_VERSION);
@@ -188,7 +189,6 @@ public class BookmarksDb extends SQLiteOpenHelperEx implements OrderableDatabase
 		}
 	}
 
-
 	/**
 	 * Check if the specified Video has been bookmarked.
 	 *
@@ -197,47 +197,21 @@ public class BookmarksDb extends SQLiteOpenHelperEx implements OrderableDatabase
 	 * @return True if it has been bookmarked, false if not.
 	 */
 	public boolean isBookmarked(String videoId) {
-		Cursor cursor = getReadableDatabase().query(
-						BookmarksTable.TABLE_NAME,
-						new String[]{BookmarksTable.COL_YOUTUBE_VIDEO_ID},
-						BookmarksTable.COL_YOUTUBE_VIDEO_ID + " = ?",
-						new String[]{videoId}, null, null, null);
-		boolean	hasVideo = cursor.moveToNext();
-
-		cursor.close();
-		return hasVideo;
+		return executeQueryForInteger(BookmarksTable.IS_BOOKMARKED_QUERY, new String[]{videoId}, 0) > 0;
 	}
-
 
 	/**
 	 * @return The total number of bookmarked videos.
 	 */
 	public int getTotalBookmarks() {
-		String	query = String.format("SELECT COUNT(*) FROM %s", BookmarksTable.TABLE_NAME);
-		Cursor	cursor = BookmarksDb.getBookmarksDb().getReadableDatabase().rawQuery(query, null);
-		int		totalBookmarks = 0;
-
-		if (cursor.moveToFirst()) {
-			totalBookmarks = cursor.getInt(0);
-		}
-
-		cursor.close();
-		return totalBookmarks;
+		return executeQueryForInteger(BookmarksTable.COUNT_ALL_BOOKMARKS, 0);
 	}
 
 	/**
 	 * @return The maximum of the order number - which could be different from the number of bookmarked videos, in case some of them are deleted.
 	 */
 	public int getMaximumOrderNumber() {
-		Cursor	cursor = getReadableDatabase().rawQuery(BookmarksTable.MAXIMUM_ORDER_QUERY, null);
-		int		maxBookmarkOrder = 0;
-
-		if (cursor.moveToFirst()) {
-			maxBookmarkOrder = cursor.getInt(0);
-		}
-
-		cursor.close();
-		return maxBookmarkOrder;
+		return executeQueryForInteger(BookmarksTable.MAXIMUM_ORDER_QUERY, 0);
 	}
 
 
@@ -308,11 +282,18 @@ public class BookmarksDb extends SQLiteOpenHelperEx implements OrderableDatabase
 	 *
 	 * @param listener The Listener (which implements BookmarksDbListener) to add.
 	 */
-	public void addListener(BookmarksDbListener listener) {
-		if(!listeners.contains(listener))
-			listeners.add(listener);
+	public void addListener(@NonNull BookmarksDbListener listener) {
+		listeners.add(listener);
 	}
 
+	/**
+	 * Remove the Listener
+	 *
+	 * @param listener The Listener (which implements BookmarksDbListener) to remove.
+	 */
+	public void removeListener(@NonNull BookmarksDbListener listener) {
+		listeners.remove(listener);
+	}
 
 	/**
 	 * Called when the Bookmarks DB is updated by a bookmark insertion.

@@ -18,15 +18,15 @@ import com.bumptech.glide.request.RequestOptions;
 import com.google.android.gms.cast.MediaInfo;
 import com.google.android.gms.cast.MediaStatus;
 import com.google.android.gms.cast.framework.media.RemoteMediaClient;
-import com.squareup.picasso.Picasso;
 
 import butterknife.BindView;
 import butterknife.ButterKnife;
 import free.rm.skytube.R;
-import free.rm.skytube.businessobjects.db.Tasks.GetChannelInfo;
+import free.rm.skytube.businessobjects.db.DatabaseTasks;
 import free.rm.skytube.gui.businessobjects.RuntimeView;
 import free.rm.skytube.gui.businessobjects.views.Linker;
 import free.rm.skytube.gui.businessobjects.views.SubscribeButton;
+import io.reactivex.rxjava3.disposables.CompositeDisposable;
 
 /**
  * Fragment class that is used for Chromecast control. This Fragment is full screen, and can be accessed by clicking on
@@ -45,6 +45,8 @@ public class ChromecastControllerFragment extends ChromecastBaseControllerFragme
 	View videoDescriptionInclude;
 
 	VideoDescriptionLayout videoDescriptionLayout;
+
+	private final CompositeDisposable compositeDisposable = new CompositeDisposable();
 
 	static class VideoDescriptionLayout {
 		@BindView(R.id.video_desc_linearlayout)
@@ -96,6 +98,12 @@ public class ChromecastControllerFragment extends ChromecastBaseControllerFragme
 	}
 
 	@Override
+	public void onDestroy() {
+		compositeDisposable.clear();
+		super.onDestroy();
+	}
+
+	@Override
 	public void init(RemoteMediaClient client, MediaInfo media, int position) {
 		super.init(client, media, position);
 		if(video != null) {
@@ -103,10 +111,10 @@ public class ChromecastControllerFragment extends ChromecastBaseControllerFragme
 		}
 		durationTextView.setMilliseconds(chromecastPlaybackProgressBar.getMax());
 		if(media.getMetadata().getImages().size() > 0) {
-			Picasso.with(getActivity().getApplicationContext())
-							.load(media.getMetadata().getImages().get(0).getUrl().toString())
-							.placeholder(R.drawable.thumbnail_default)
-							.into(videoImage);
+			Glide.with(getContext())
+					.load(media.getMetadata().getImages().get(0).getUrl().toString())
+					.apply(new RequestOptions().placeholder(R.drawable.thumbnail_default))
+					.into(videoImage);
 		}
 	}
 
@@ -130,22 +138,21 @@ public class ChromecastControllerFragment extends ChromecastBaseControllerFragme
 			videoDescriptionLayout.ratingsDisabled.setVisibility(View.VISIBLE);
 		}
 
+		compositeDisposable.add(
+				DatabaseTasks.getChannelInfo(requireContext(), video.getChannelId(), false)
+						.subscribe(youTubeChannel -> {
+							if (youTubeChannel.isUserSubscribed())
+								videoDescriptionLayout.subscribeButton.setUnsubscribeState();
+							else
+								videoDescriptionLayout.subscribeButton.setSubscribeState();
+							videoDescriptionLayout.subscribeButton.setChannel(youTubeChannel);
 
-		new GetChannelInfo(getActivity(), youTubeChannel -> {
-			if(youTubeChannel.isUserSubscribed())
-				videoDescriptionLayout.subscribeButton.setUnsubscribeState();
-			else
-				videoDescriptionLayout.subscribeButton.setSubscribeState();
-			videoDescriptionLayout.subscribeButton.setChannel(youTubeChannel);
-
-			if (youTubeChannel != null) {
-				Glide.with(getActivity())
-								.load(youTubeChannel.getThumbnailUrl())
-								.apply(new RequestOptions().placeholder(R.drawable.channel_thumbnail_default))
-								.into(videoDescriptionLayout.thumbnail);
-			}
-		}).executeInParallel(video.getChannelId());
-
+							Glide.with(requireContext())
+									.load(youTubeChannel.getThumbnailUrl())
+									.apply(new RequestOptions().placeholder(R.drawable.channel_thumbnail_default))
+									.into(videoDescriptionLayout.thumbnail);
+						})
+		);
 	}
 
 	@Override

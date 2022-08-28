@@ -19,10 +19,6 @@ package free.rm.skytube.app;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
 import java.util.Arrays;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
-import javax.annotation.Nullable;
 
 public class Utils {
 
@@ -32,22 +28,10 @@ public class Utils {
         return speedFormatter.format(speed);
     }
 
-
-    // TODO: Eliminate when API level 19 is used.
-    public static void requireNonNull(Object obj, String message) {
-        if (obj == null) {
-            throw new NullPointerException(message);
-        }
-    }
-
     public static void isTrue(boolean flag, String message) {
         if (!flag) {
             throw new IllegalArgumentException("Error: "+message);
         }
-    }
-
-    public static boolean equals(Object a, Object b) {
-        return  a == b || (a != null && a.equals(b));
     }
 
     public static boolean isEmpty(String str) {
@@ -81,6 +65,25 @@ public class Utils {
             channelId = channelId.split("channel/")[1];
         }
         return  channelId;
+    }
+
+    /**
+     * Creates len amount of "?" for using in WHERE clause
+     * @param len length of list
+     * @return len amount of "?"
+     */
+    public static String makePlaceholders(int len) {
+        if (len < 1) {
+            // It will lead to an invalid query anyway ..
+            throw new RuntimeException("No placeholders");
+        } else {
+            StringBuilder sb = new StringBuilder(len * 2 - 1);
+            sb.append("?");
+            for (int i = 1; i < len; i++) {
+                sb.append(",?");
+            }
+            return sb.toString();
+        }
     }
 
 }

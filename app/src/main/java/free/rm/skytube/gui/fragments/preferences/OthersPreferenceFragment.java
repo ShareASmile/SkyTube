@@ -20,12 +20,12 @@ package free.rm.skytube.gui.fragments.preferences;
 import android.app.AlertDialog;
 import android.content.SharedPreferences;
 import android.os.Bundle;
-import android.preference.EditTextPreference;
-import android.preference.ListPreference;
-import android.preference.Preference;
-import android.preference.MultiSelectListPreference;
-import android.preference.PreferenceFragment;
 import android.widget.Toast;
+
+import androidx.preference.EditTextPreference;
+import androidx.preference.ListPreference;
+import androidx.preference.MultiSelectListPreference;
+import androidx.preference.PreferenceFragmentCompat;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -42,29 +42,28 @@ import free.rm.skytube.gui.businessobjects.adapters.SubsAdapter;
 /**
  * Preference fragment for other settings.
  */
-public class OthersPreferenceFragment extends PreferenceFragment implements SharedPreferences.OnSharedPreferenceChangeListener {
-	private Preference folderChooser;
-
+public class OthersPreferenceFragment extends PreferenceFragmentCompat
+		implements SharedPreferences.OnSharedPreferenceChangeListener {
 	ListPreference defaultTabPref;
 
 	@Override
-	public void onCreate(Bundle savedInstanceState) {
-		super.onCreate(savedInstanceState);
+	public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
 		addPreferencesFromResource(R.xml.preference_others);
 
 		// Default tab
-		defaultTabPref = (ListPreference)findPreference(getString(R.string.pref_key_default_tab_name));
+		defaultTabPref = findPreference(getString(R.string.pref_key_default_tab_name));
 		Set<String> hiddenFragments = SkyTubeApp.getPreferenceManager().getStringSet(getString(R.string.pref_key_hide_tabs), new HashSet<>());
 		String[] tabListValues = SkyTubeApp.getStringArray(R.array.tab_list_values);
-		if(hiddenFragments.size() == 0) {
-			defaultTabPref.setEntries(SkyTubeApp.getStringArray(R.array.tab_list));
+		final String[] tabList = SkyTubeApp.getStringArray(R.array.tab_list);
+		if(hiddenFragments.isEmpty()) {
+			defaultTabPref.setEntries(tabList);
 			defaultTabPref.setEntryValues(tabListValues);
 		} else {
 			List<String> defaultTabEntries = new ArrayList<>();
 			List<String> defaultTabEntryValues = new ArrayList<>();
-			for(int i=0;i<SkyTubeApp.getStringArray(R.array.tab_list).length;i++) {
+			for(int i = 0; i< tabList.length; i++) {
 				if(!hiddenFragments.contains(tabListValues[i])) {
-					defaultTabEntries.add(SkyTubeApp.getStringArray(R.array.tab_list)[i]);
+					defaultTabEntries.add(tabList[i]);
 					defaultTabEntryValues.add(tabListValues[i]);
 
 				}
@@ -77,7 +76,7 @@ public class OthersPreferenceFragment extends PreferenceFragment implements Shar
 		}
 		defaultTabPref.setSummary(String.format(getString(R.string.pref_summary_default_tab), defaultTabPref.getEntry()));
 
-		MultiSelectListPreference hiddenTabsPref = (MultiSelectListPreference)findPreference(getString(R.string.pref_key_hide_tabs));
+		MultiSelectListPreference hiddenTabsPref = findPreference(getString(R.string.pref_key_hide_tabs));
 		hiddenTabsPref.setEntryValues(tabListValues);
 
 //		ListPreference feedNotificationPref = (ListPreference) findPreference(getString(R.string.pref_feed_notification_key));

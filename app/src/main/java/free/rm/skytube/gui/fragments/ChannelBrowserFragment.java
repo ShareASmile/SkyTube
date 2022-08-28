@@ -17,26 +17,27 @@
 
 package free.rm.skytube.gui.fragments;
 
-import android.content.Intent;
 import android.os.Bundle;
-import com.google.android.material.tabs.TabLayout;
-import androidx.fragment.app.FragmentManager;
-import androidx.fragment.app.FragmentPagerAdapter;
-import androidx.viewpager.widget.ViewPager;
-import androidx.appcompat.app.ActionBar;
-import androidx.appcompat.widget.Toolbar;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+import androidx.appcompat.app.ActionBar;
+import androidx.appcompat.widget.Toolbar;
+import androidx.fragment.app.FragmentManager;
+import androidx.fragment.app.FragmentPagerAdapter;
+import androidx.viewpager.widget.ViewPager;
+
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.request.RequestOptions;
+import com.google.android.material.tabs.TabLayout;
 
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Objects;
 
 import free.rm.skytube.R;
 import free.rm.skytube.app.Utils;
@@ -45,12 +46,12 @@ import free.rm.skytube.businessobjects.YouTube.POJOs.CardData;
 import free.rm.skytube.businessobjects.YouTube.POJOs.YouTubeChannel;
 import free.rm.skytube.businessobjects.YouTube.POJOs.YouTubeChannelInterface;
 import free.rm.skytube.businessobjects.YouTube.POJOs.YouTubeVideo;
-import free.rm.skytube.businessobjects.db.Tasks.GetChannelInfo;
-import free.rm.skytube.gui.activities.MainActivity;
+import free.rm.skytube.businessobjects.db.DatabaseTasks;
 import free.rm.skytube.gui.businessobjects.adapters.SubsAdapter;
 import free.rm.skytube.gui.businessobjects.fragments.FragmentEx;
 import free.rm.skytube.gui.businessobjects.fragments.TabFragment;
 import free.rm.skytube.gui.businessobjects.views.SubscribeButton;
+import io.reactivex.rxjava3.disposables.Disposable;
 
 /**
  * A Fragment that displays information about a channel.
@@ -73,7 +74,7 @@ public class ChannelBrowserFragment extends FragmentEx {
 	private ImageView			channelBannerImage = null;
 	private TextView			channelSubscribersTextView = null;
 	private SubscribeButton		channelSubscribeButton = null;
-	private GetChannelInfo   	task = null;
+	private Disposable          disposable = null;
 
 	public static final String CHANNEL_OBJ = "ChannelBrowserFragment.ChannelObj";
 	public static final String CHANNEL_ID  = "ChannelBrowserFragment.ChannelID";
@@ -161,6 +162,16 @@ public class ChannelBrowserFragment extends FragmentEx {
 
 		return fragment;
 	}
+
+	@Override
+	public void onDestroy() {
+		if (disposable != null) {
+			disposable.dispose();
+		}
+		channelSubscribeButton.clearBackgroundTasks();
+		super.onDestroy();
+	}
+
 	private void getChannelParameters() {
 		// we need to create a YouTubeChannel object:  this can be done by either:
 		//   (1) the YouTubeChannel object is passed to this Fragment
@@ -175,15 +186,24 @@ public class ChannelBrowserFragment extends FragmentEx {
 			channelId = channel.getId();
 		} else {
 			channelId = bundle.getString(CHANNEL_ID);
-			if (!Utils.equals(oldChannelId, channelId)) {
+			if (!Objects.equals(oldChannelId, channelId)) {
 				this.channel = null;
 			}
 		}
 		if (channel == null) {
-			if (task == null) {
-				task = new GetChannelInfo(getContext(), new ProcessChannel());
+			if (disposable == null) {
+				disposable = DatabaseTasks.getChannelInfo(requireContext(), channelId, false)
+						.subscribe(youTubeChannel -> {
+							if (youTubeChannel == null) {
+								return;
+							}
+							// In the event this fragment is passed a channel id and not a channel object, set the
+							// channel the subscribe button is for since there wasn't a channel object to set when
+							// the button was created.
+							channel = youTubeChannel;
+							initViews();
+						});
 			}
-			task.executeInParallel(channelId);
 		} else {
 			initViews();
 		}

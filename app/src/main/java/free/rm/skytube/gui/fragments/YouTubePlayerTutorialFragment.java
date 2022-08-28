@@ -17,16 +17,16 @@
 
 package free.rm.skytube.gui.fragments;
 
-import android.content.Context;
 import android.os.Bundle;
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
-import androidx.viewpager.widget.PagerAdapter;
-import androidx.viewpager.widget.ViewPager;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.viewpager.widget.PagerAdapter;
+import androidx.viewpager.widget.ViewPager;
 
 import free.rm.skytube.R;
 import free.rm.skytube.app.SkyTubeApp;
@@ -42,7 +42,7 @@ public class YouTubePlayerTutorialFragment extends ImmersiveModeFragment impleme
 	private TextView                        nextTextView;
 	private TextView                        pageCounterTextView;
 	/** Tutorial slides layout resources. */
-	private final static int tutorialSlideViews[] = {R.layout.tutorial_player_1, R.layout.tutorial_player_2, R.layout.tutorial_player_3, R.layout.tutorial_player_4, R.layout.tutorial_player_5, R.layout.tutorial_player_6};
+	private final static int[] tutorialSlideViews = {R.layout.tutorial_player_1, R.layout.tutorial_player_2, R.layout.tutorial_player_3, R.layout.tutorial_player_4, R.layout.tutorial_player_5, R.layout.tutorial_player_6};
 
 
 	@Nullable
@@ -126,8 +126,7 @@ public class YouTubePlayerTutorialFragment extends ImmersiveModeFragment impleme
 		@Override
 		public Object instantiateItem(@NonNull ViewGroup container, int position) {
 			// inflate the tutorial slide layout resource according to the give position...
-			LayoutInflater inflater = (LayoutInflater) getActivity().getSystemService(Context.LAYOUT_INFLATER_SERVICE);
-			View tutorialSlideView = inflater.inflate(tutorialSlideViews[position], null);
+			View tutorialSlideView = LayoutInflater.from(getActivity()).inflate(tutorialSlideViews[position], null);
 
 			configureBrightnessVolumeLabels(tutorialSlideView);
 

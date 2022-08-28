@@ -17,11 +17,11 @@
 
 package free.rm.skytube.app;
 
-import android.annotation.TargetApi;
 import android.app.AlarmManager;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
+import android.content.ActivityNotFoundException;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.ComponentName;
@@ -29,18 +29,21 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
-import androidx.core.graphics.ColorUtils;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.net.Uri;
 import android.os.Build;
 import android.os.SystemClock;
-import android.preference.PreferenceManager;
 import android.util.Log;
 import android.widget.Toast;
 
-import androidx.multidex.MultiDexApplication;
+import androidx.annotation.NonNull;
+import androidx.core.content.ContextCompat;
 import androidx.core.content.res.ResourcesCompat;
+import androidx.core.graphics.ColorUtils;
+import androidx.core.net.ConnectivityManagerCompat;
+import androidx.multidex.MultiDexApplication;
+import androidx.preference.PreferenceManager;
 
 import com.google.api.client.googleapis.json.GoogleJsonError;
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
@@ -57,11 +60,13 @@ import free.rm.skytube.businessobjects.YouTube.POJOs.YouTubePlaylist;
 import free.rm.skytube.businessobjects.YouTube.Tasks.GetPlaylistTask;
 import free.rm.skytube.businessobjects.YouTube.newpipe.ContentId;
 import free.rm.skytube.businessobjects.YouTube.newpipe.NewPipeService;
-import free.rm.skytube.businessobjects.db.Tasks.GetChannelInfo;
+import free.rm.skytube.businessobjects.db.DatabaseTasks;
 import free.rm.skytube.gui.activities.MainActivity;
 import free.rm.skytube.gui.businessobjects.YouTubePlayer;
 import free.rm.skytube.gui.fragments.ChannelBrowserFragment;
+import free.rm.skytube.gui.fragments.FragmentNames;
 import free.rm.skytube.gui.fragments.PlaylistVideosFragment;
+import io.reactivex.rxjava3.disposables.CompositeDisposable;
 
 /**
  * SkyTube application.
@@ -71,17 +76,28 @@ public class SkyTubeApp extends MultiDexApplication {
 	/** SkyTube Application databaseInstance. */
 	private static SkyTubeApp skyTubeApp = null;
 	private Settings settings;
+	private FragmentNames names;
 
 	public static final String KEY_SUBSCRIPTIONS_LAST_UPDATED = "SkyTubeApp.KEY_SUBSCRIPTIONS_LAST_UPDATED";
 	public static final String NEW_VIDEOS_NOTIFICATION_CHANNEL = "free.rm.skytube.NEW_VIDEOS_NOTIFICATION_CHANNEL";
 	public static final int NEW_VIDEOS_NOTIFICATION_CHANNEL_ID = 1;
 
+	private static final CompositeDisposable COMPOSITE_DISPOSABLE = new CompositeDisposable();
+
 	@Override
 	public void onCreate() {
 		super.onCreate();
 		this.settings = new Settings(this);
+		this.settings.migrate();
+		this.names = new FragmentNames(this);
 		skyTubeApp = this;
 		initChannels(this);
+	}
+
+	@Override
+	public void onTerminate() {
+		COMPOSITE_DISPOSABLE.clear();
+		super.onTerminate();
 	}
 
 	/**
@@ -155,6 +171,9 @@ public class SkyTubeApp extends MultiDexApplication {
 		return skyTubeApp.getBaseContext();
 	}
 
+	public static FragmentNames getFragmentNames() {
+		return skyTubeApp.names;
+	}
 
 	/**
 	 * Restart the app.
@@ -179,13 +198,11 @@ public class SkyTubeApp extends MultiDexApplication {
 
 
 	/**
-	 * @return True if the device is connected via mobile network such as 4G.
+	 * @return True if the device is connected to a metered network.
 	 */
-	public static boolean isConnectedToMobile() {
-		final ConnectivityManager connMgr = (ConnectivityManager)
-				getContext().getSystemService(Context.CONNECTIVITY_SERVICE);
-		final android.net.NetworkInfo mobile = connMgr.getNetworkInfo(ConnectivityManager.TYPE_MOBILE);
-		return mobile != null && mobile.isConnectedOrConnecting();
+	public static boolean isActiveNetworkMetered() {
+		return ConnectivityManagerCompat.isActiveNetworkMetered(ContextCompat.getSystemService(skyTubeApp,
+				ConnectivityManager.class));
 	}
 
 	/**
@@ -193,9 +210,8 @@ public class SkyTubeApp extends MultiDexApplication {
 	 * @param context
 	 * @return
 	 */
-	public static NetworkInfo getNetworkInfo(Context context){
-		ConnectivityManager cm = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
-		return cm.getActiveNetworkInfo();
+	public static NetworkInfo getNetworkInfo(@NonNull Context context){
+		return ContextCompat.getSystemService(context, ConnectivityManager.class).getActiveNetworkInfo();
 	}
 
 	/**
@@ -203,7 +219,7 @@ public class SkyTubeApp extends MultiDexApplication {
 	 * @param context
 	 * @return
 	 */
-	public static boolean isConnected(Context context){
+	public static boolean isConnected(@NonNull Context context){
 		NetworkInfo info = getNetworkInfo(context);
 		return (info != null && info.isConnected());
 	}
@@ -212,19 +228,15 @@ public class SkyTubeApp extends MultiDexApplication {
 	 * Initialize Notification Channels (for Android OREO)
 	 * @param context
 	 */
-	@TargetApi(26)
-	private void initChannels(Context context) {
-
+	private void initChannels(@NonNull Context context) {
 		if(Build.VERSION.SDK_INT < 26) {
 			return;
 		}
-		NotificationManager notificationManager =
-				(NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+		NotificationManager notificationManager = getSystemService(NotificationManager.class);
 
-		String channelId = NEW_VIDEOS_NOTIFICATION_CHANNEL;
 		CharSequence channelName = context.getString(R.string.notification_channel_feed_title);
 		int importance = NotificationManager.IMPORTANCE_LOW;
-		NotificationChannel notificationChannel = new NotificationChannel(channelId, channelName, importance);
+		NotificationChannel notificationChannel = new NotificationChannel(NEW_VIDEOS_NOTIFICATION_CHANNEL, channelName, importance);
 		notificationChannel.enableLights(true);
 		notificationChannel.setLightColor(ColorUtils.compositeColors(0xFFFF0000, 0xFFFF0000));
 		notificationChannel.enableVibration(false);
@@ -247,7 +259,7 @@ public class SkyTubeApp extends MultiDexApplication {
 	public static void setFeedUpdateInterval(int interval) {
 		Intent alarm = new Intent(getContext(), FeedUpdaterReceiver.class);
 		PendingIntent pendingIntent = PendingIntent.getBroadcast(getContext(), 0, alarm, PendingIntent.FLAG_CANCEL_CURRENT);
-		AlarmManager alarmManager = (AlarmManager) getContext().getSystemService(Context.ALARM_SERVICE);
+		AlarmManager alarmManager = ContextCompat.getSystemService(getContext(), AlarmManager.class);
 
 		// Feed Auto Updater has been cancelled. If the selected interval is greater than 0, set the new alarm to call FeedUpdaterService
 		if(interval > 0) {
@@ -259,7 +271,7 @@ public class SkyTubeApp extends MultiDexApplication {
 		return skyTubeApp.settings;
 	}
 
-	public static void notifyUserOnError(Context ctx, Exception exc) {
+	public static void notifyUserOnError(@NonNull Context ctx, Exception exc) {
 		if (exc == null) {
 			return;
 		}
@@ -282,17 +294,16 @@ public class SkyTubeApp extends MultiDexApplication {
 	}
 
 
-	public static void shareUrl(Context context, String url) {
+	public static void shareUrl(@NonNull Context context, String url) {
 		Intent intent = new Intent(android.content.Intent.ACTION_SEND);
 		intent.setType("text/plain");
 		intent.putExtra(android.content.Intent.EXTRA_TEXT, url);
 		context.startActivity(Intent.createChooser(intent, context.getString(R.string.share_via)));
 	}
 
-	public static void copyUrl(Context context, String text, String url) {
-		ClipboardManager clipboard = (ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
+	public static void copyUrl(@NonNull Context context, String text, String url) {
 		ClipData clip = ClipData.newPlainText(text, url);
-		clipboard.setPrimaryClip(clip);
+		ContextCompat.getSystemService(context, ClipboardManager.class).setPrimaryClip(clip);
 		Toast.makeText(context, R.string.url_copied_to_clipboard, Toast.LENGTH_SHORT).show();
 	}
 
@@ -301,19 +312,18 @@ public class SkyTubeApp extends MultiDexApplication {
 	 *
 	 * @return The URL of the YouTube video the user wants to play.
 	 */
-	public static ContentId getUrlFromIntent(final Context ctx, final Intent intent) {
+	public static ContentId getUrlFromIntent(@NonNull final Context ctx, final Intent intent) {
 		if (Intent.ACTION_VIEW.equals(intent.getAction()) && intent.getData() != null) {
 			return parseUrl(ctx, intent.getData().toString(), true);
 		}
 		return null;
 	}
 
-	public static ContentId parseUrl(Context context, String url, boolean showErrorIfNotValid) {
+	public static ContentId parseUrl(@NonNull Context context, String url, boolean showErrorIfNotValid) {
 		try {
 			ContentId id = NewPipeService.get().getContentId(url);
 			if (id == null && showErrorIfNotValid) {
-				String message = String.format(context.getString(R.string.error_invalid_url), url);
-				Toast.makeText(context, message, Toast.LENGTH_LONG).show();
+				showInvalidUrlToast(context, url);
 			}
 			return id;
 		} catch (FoundAdException e) {
@@ -325,6 +335,12 @@ public class SkyTubeApp extends MultiDexApplication {
 		}
 
 	}
+
+	private static void showInvalidUrlToast(@NonNull Context context, String url) {
+		String message = String.format(context.getString(R.string.error_invalid_url), url);
+		Toast.makeText(context, message, Toast.LENGTH_LONG).show();
+	}
+
 	/**
 	 * Open the url - internally, or externally if useExternalBrowser is switched on.
 	 * @param ctx
@@ -365,9 +381,8 @@ public class SkyTubeApp extends MultiDexApplication {
 				break;
 			}
 			case PLAYLIST: {
-				new GetPlaylistTask(ctx, content.getId(), playlist -> {
-					launchPlaylist(playlist, ctx);
-				}).executeInParallel();
+				new GetPlaylistTask(ctx, content.getId(), playlist ->
+						launchPlaylist(playlist, ctx)).executeInParallel();
 				break;
 			}
 			default: {
@@ -385,10 +400,8 @@ public class SkyTubeApp extends MultiDexApplication {
 	 */
 	public static void launchChannel(String channelId, Context context) {
 		if (channelId != null) {
-			new GetChannelInfo(context,
-					youTubeChannel -> SkyTubeApp.launchChannel(youTubeChannel, context),
-					true)
-					.executeInParallel(channelId);
+			COMPOSITE_DISPOSABLE.add(DatabaseTasks.getChannelInfo(context, channelId, true)
+					.subscribe(youTubeChannel -> launchChannel(youTubeChannel, context)));
 		}
 	}
 
@@ -422,7 +435,12 @@ public class SkyTubeApp extends MultiDexApplication {
 	public static void viewInBrowser(String url, final Context context) {
 		Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
 		browserIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-		context.startActivity(browserIntent);
+		try {
+			context.startActivity(browserIntent);
+		} catch (ActivityNotFoundException e) {
+			showInvalidUrlToast(context, url);
+			Log.e("SkyTubeApp", "Activity not found for " + url + ", error:" + e.getMessage(), e);
+		}
 	}
 
 }

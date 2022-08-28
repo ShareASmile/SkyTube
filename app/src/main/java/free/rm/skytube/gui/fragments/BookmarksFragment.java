@@ -18,8 +18,11 @@
 package free.rm.skytube.gui.fragments;
 
 import android.os.Bundle;
-import androidx.annotation.Nullable;
+import android.view.LayoutInflater;
 import android.view.View;
+import android.view.ViewGroup;
+
+import androidx.annotation.Nullable;
 
 import butterknife.BindView;
 import free.rm.skytube.R;
@@ -40,14 +43,16 @@ public class BookmarksFragment extends OrderableVideosGridFragment implements Bo
 	View noBookmarkedVideosText;
 
 	public BookmarksFragment() {
-		super(new OrderableVideoGridAdapter(null, BookmarksDb.getBookmarksDb()));
 	}
 
 	@Override
-	public void onViewCreated(View view, @Nullable Bundle savedInstanceState) {
-		super.onViewCreated(view, savedInstanceState);
+	public View onCreateView(LayoutInflater inflater, ViewGroup container, @Nullable Bundle savedInstanceState) {
+		setVideoGridAdapter(new OrderableVideoGridAdapter(BookmarksDb.getBookmarksDb()));
+		View view = super.onCreateView(inflater, container, savedInstanceState);
 		swipeRefreshLayout.setEnabled(false);
+		BookmarksDb.getBookmarksDb().addListener(this);
 		populateList();
+		return view;
 	}
 
 	private void populateList() {
@@ -67,11 +72,15 @@ public class BookmarksFragment extends OrderableVideosGridFragment implements Bo
 	@Override
 	public void onBookmarkAdded(YouTubeVideo video) {
 		videoGridAdapter.prepend(video);
+		setBookmarkListVisible(true);
 	}
 
 	@Override
 	public void onBookmarkDeleted(VideoId videoId) {
 		videoGridAdapter.remove( card -> videoId.getId().equals(card.getId()));
+		if (videoGridAdapter.getItemCount() == 0) {
+			setBookmarkListVisible(false);
+		}
 	}
 
 	@Override
@@ -90,8 +99,32 @@ public class BookmarksFragment extends OrderableVideosGridFragment implements Bo
 	public String getFragmentName() {
 		return SkyTubeApp.getStr(R.string.bookmarks);
 	}
-	
 
+	@Override
+	public int getPriority() {
+		return 3;
+	}
+
+	@Override
+	public String getBundleKey() {
+		return MainFragment.BOOKMARKS_FRAGMENT;
+	}
+
+	@Override
+	public void onDestroyView() {
+		BookmarksDb.getBookmarksDb().removeListener(this);
+		super.onDestroyView();
+	}
+
+	private void setBookmarkListVisible(boolean visible) {
+		if (visible) {
+			swipeRefreshLayout.setVisibility(View.VISIBLE);
+			noBookmarkedVideosText.setVisibility(View.GONE);
+		} else {
+			swipeRefreshLayout.setVisibility(View.GONE);
+			noBookmarkedVideosText.setVisibility(View.VISIBLE);
+		}
+	}
 	////////////////////////////////////////////////////////////////////////////////////////////////
 
 	/**
@@ -115,13 +148,9 @@ public class BookmarksFragment extends OrderableVideosGridFragment implements Bo
 			}
 			// If no videos have been bookmarked, show the text notifying the user, otherwise
 			// show the swipe refresh layout that contains the actual video grid.
-			if (numVideosBookmarked <= 0) {
-				swipeRefreshLayout.setVisibility(View.GONE);
-				noBookmarkedVideosText.setVisibility(View.VISIBLE);
-			} else {
-				swipeRefreshLayout.setVisibility(View.VISIBLE);
-				noBookmarkedVideosText.setVisibility(View.GONE);
-
+			boolean listShouldBeVisible = numVideosBookmarked > 0;
+			setBookmarkListVisible(listShouldBeVisible);
+			if (listShouldBeVisible) {
 				// set video category and get the bookmarked videos asynchronously
 				videoGridAdapter.setVideoCategory(VideoCategory.BOOKMARKS_VIDEOS);
 			}
