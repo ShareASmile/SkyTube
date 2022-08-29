@@ -167,7 +167,7 @@ dependencies {
         exclude group: 'com.google.http-client', module: 'google-http-client-jackson2'
     }
 
-    implementation 'com.github.ShareASmile:NewPipeExtractor:6d84abac41a41309b1661c26d31d971264496367'
+    implementation 'com.github.ShareASmile:NewPipeExtractor:e55c9400de56679fe4d08a526314633037ae66f9'
 
 '
 
