@@ -4,6 +4,9 @@ on:
   workflow_dispatch:
   push:
     branches:
+      - master
+      - dev
+      - legacy
       - min
       - medium
       - branch-v2.973
@@ -14,6 +17,9 @@ on:
       - dark-theme-v2.977
   pull_request:
     branches:
+      - master
+      - dev
+      - legacy
       - min
       - medium
       - branch-v2.973
