@@ -1,10 +1,31 @@
 name: Android CI
 
 on:
+  workflow_dispatch:
   push:
-    branches: [ master ]
+    branches:
+      - master
+      - dev
+      - legacy
+      - min
+      - medium
+      - branch-v2.973
+      - branch-v2.975
+      - branch_v2.982
+      - dev-level
+      - develop
   pull_request:
-    branches: [ master ]
+    branches:
+      - master
+      - dev
+      - legacy
+      - min
+      - medium
+      - branch-v2.973
+      - branch-v2.975
+      - branch_v2.982
+      - dev-level
+      - develop
 
 jobs:
   build:
