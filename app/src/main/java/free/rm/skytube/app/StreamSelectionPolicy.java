@@ -119,7 +119,7 @@ public class StreamSelectionPolicy {
     }
 
     private static String toHumanReadable(AudioStream as) {
-        return as != null ? "AudioStream(" + as.getAverageBitrate() + ", " + as.getFormat() + ", codec=" + as.getCodec() + ", q=" + as.getQuality() + ")" : "NULL";
+        return as != null ? "AudioStream("+as.getAverageBitrate()+", "+as.getFormat()+", codec="+as.getCodec()+", q="+as.getQuality()+")": "NULL";
     }
 
     private boolean isBetter(AudioStream best, AudioStream other) {
@@ -127,10 +127,8 @@ public class StreamSelectionPolicy {
             return true;
         }
         switch (videoQuality) {
-            case LEAST_BANDWITH:
-                return other.getAverageBitrate() < best.getAverageBitrate();
-            case BEST_QUALITY:
-                return best.getAverageBitrate() < other.getAverageBitrate();
+            case LEAST_BANDWITH: return other.average_bitrate < best.average_bitrate;
+            case BEST_QUALITY: return best.average_bitrate < other.average_bitrate;
         }
         throw new IllegalStateException("Unexpected videoQuality:" + videoQuality);
     }

@@ -17,6 +17,7 @@
 
 package free.rm.skytube.gui.fragments;
 
+import static java.security.AccessController.getContext;
 import static free.rm.skytube.gui.activities.YouTubePlayerActivity.YOUTUBE_VIDEO_OBJ;
 
 import android.app.Activity;
@@ -48,6 +49,7 @@ import androidx.annotation.RequiresApi;
 import androidx.appcompat.widget.Toolbar;
 import androidx.core.content.ContextCompat;
 import androidx.media.AudioManagerCompat;
+import androidx.preference.PreferenceManager;
 
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.request.RequestOptions;
@@ -258,6 +260,10 @@ public class YouTubePlayerV2Fragment extends ImmersiveModeFragment implements Yo
         });
         this.playbackSpeedController = new PlaybackSpeedController(getContext(),
                 playbackSpeedTextView, player);
+
+        //set playback speed
+        float playbackSpeed = SkyTubeApp.getSettings().getDefaultPlaybackSpeed();
+        playbackSpeedController.setPlaybackSpeed(playbackSpeed);
 
         Linker.configure(videoDescriptionBinding.videoDescDescription);
     }

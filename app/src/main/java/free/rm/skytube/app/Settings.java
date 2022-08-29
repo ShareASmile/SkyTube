@@ -36,6 +36,7 @@ import free.rm.skytube.app.enums.Policy;
 import free.rm.skytube.businessobjects.Logger;
 import free.rm.skytube.businessobjects.YouTube.VideoStream.VideoQuality;
 import free.rm.skytube.businessobjects.YouTube.VideoStream.VideoResolution;
+import free.rm.skytube.gui.fragments.MainFragment;
 import free.rm.skytube.gui.fragments.SubscriptionsFeedFragment;
 
 /**
@@ -64,6 +65,11 @@ public class Settings {
         setDefault(sharedPreferences, R.string.pref_key_video_quality_for_downloads, VideoQuality.BEST_QUALITY.name());
         setDefault(sharedPreferences, R.string.pref_key_video_quality_on_mobile, VideoQuality.LEAST_BANDWITH.name());
         setDefault(sharedPreferences, R.string.pref_key_use_newer_formats, Build.VERSION.SDK_INT > 16);
+        setDefault(sharedPreferences, R.string.pref_key_playback_speed, "1.0");
+        Set<String> defaultTabs = new HashSet<>();
+        defaultTabs.add(MainFragment.FEATURED_VIDEOS_FRAGMENT);
+        setDefault(sharedPreferences, R.string.pref_key_hide_tabs, defaultTabs);
+        setDefault(sharedPreferences, R.string.pref_key_default_tab_name, MainFragment.MOST_POPULAR_VIDEOS_FRAGMENT);
     }
 
     private void migrate(SharedPreferences sharedPreferences, String oldKey, @StringRes int newKey) {
@@ -87,6 +93,8 @@ public class Settings {
                 editor.putString(keyStr, (String) defaultValue);
             } else if (defaultValue instanceof Boolean) {
                 editor.putBoolean(keyStr, (Boolean) defaultValue);
+            } else if (defaultValue instanceof Set) {
+                editor.putStringSet(keyStr, (Set<String>) defaultValue);
             } else {
                 throw new IllegalArgumentException("Default value is " + defaultValue + " for " + keyStr);
             }
@@ -344,5 +352,12 @@ public class Settings {
 
     public void setDisplayedReleaseNoteTag(String newValue) {
         setPreference(LATEST_RELEASE_NOTES_DISPLAYED, newValue);
+
+    public float getDefaultPlaybackSpeed() {
+        try {
+            return Float.parseFloat(getPreference(R.string.pref_key_playback_speed, "1.0"));
+        } catch (NumberFormatException nfe) {
+            return 1.0F;
+        }
     }
 }
