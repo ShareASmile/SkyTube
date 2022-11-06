@@ -11,8 +11,8 @@ android {
         //noinspection ExpiredTargetSdkVersion
         targetSdkVersion 28
 
-        versionName "2.984"    // digits of the *fractional part* shall NOT be > than "9"
-        versionCode 44
+        versionName "2.984.1"    // digits of the *fractional part* shall NOT be > than "9"
+        versionCode 45
         // Third party devs:  pls be ethical and change the below keys
         //buildConfigField 'String',   'YOUTUBE_API_KEYS_DEBUG', '"AIzaSyDU-ZZCyOB_kYkiMSZ6ooSipUZRukHU4ik"'
         buildConfigField 'String', 'YOUTUBE_API_KEYS_DEBUG', '"hidden:A0C0B03EED58193F4CD52DF668495D523A5229C6B66B0ED6282AE09BD8FF08CD5AF9A6B52C214F"'
@@ -160,7 +160,7 @@ dependencies {
 /**** Backend logic ****/
 
     // Social style date / time formatting for Java
-    implementation 'org.ocpsoft.prettytime:prettytime:5.0.1.Final'
+    implementation 'org.ocpsoft.prettytime:prettytime:5.0.6.Final'
 
     // Convert Java objects into JSON and back
     implementation 'com.google.code.gson:gson:2.8.8'
@@ -173,7 +173,7 @@ dependencies {
         exclude group: 'com.google.http-client', module: 'google-http-client-jackson2'
     }
 
-    implementation 'com.github.SkyTubeTeam.NewPipeExtractor:NewPipeExtractor:skytube-2022-08-25'
+    implementation 'com.github.ShareASmile.NewPipeExtractor:6701b0fe718f6bdc385221341fa473e8aaab560e'
 
     implementation ('com.github.SkyTubeTeam.components:okhttp-client:v0.0.5') {
         exclude group: 'com.github.SkyTubeTeam.NewPipeExtractor', module: 'extractor'
