@@ -1,3 +1,11 @@
+v2.984 - 2023-12-28
+        * Newest NewPipeExtractor to fix Youtube parsing
+
+v2.983 - 2022-08-25
+        * Fix running on Android 4.4 & lower
+        * Fix broken Youtube video loading
+        * Minor cleanups, and preparations for raising the required Android level. Old Androids will be supported through 'SkyTube Legacy'
+
 v2.981 - 2022-04-16
         * Add Sponsorblock support by James Cullum
         * Update NewPipeExtractor to fix recent Youtube changes
