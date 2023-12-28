@@ -39,7 +39,7 @@ public class CommentPager extends Pager<CommentsInfoItem, YouTubeCommentThread> 
                     infoItem.getUploaderUrl(),
                     infoItem.getUploaderName(),
                     infoItem.getThumbnailUrl(),
-                    infoItem.getCommentText(),
+                    infoItem.getCommentText().getContent(),
                     infoItem.getTextualUploadDate(),
                     infoItem.getLikeCount(),
                     infoItem.isPinned(),
