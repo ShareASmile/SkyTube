@@ -352,6 +352,7 @@ public class Settings {
 
     public void setDisplayedReleaseNoteTag(String newValue) {
         setPreference(LATEST_RELEASE_NOTES_DISPLAYED, newValue);
+    }
 
     public float getDefaultPlaybackSpeed() {
         try {
