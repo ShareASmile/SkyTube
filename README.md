@@ -3,7 +3,7 @@
 
 <a href="#download">![Download APK](https://img.shields.io/github/downloads/SkyTubeTeam/SkyTube/total.svg?label=SkyTube+Extra+Downloads)</a>
 <a href="https://hosted.weblate.org/engage/skytube/?utm_source=widget"> <img src="https://hosted.weblate.org/widgets/skytube/-/svg-badge.svg" alt="Translate"/> </a>
-[![Build Status](https://github.com/ShareASmile/SkyTube/workflows/android/badge.svg?branch=legacy&event=push)](https://github.com/ShareASmile/SkyTube/actions)
+[![Build status](https://github.com/ShareASmile/SkyTube/actions/workflows/android.yml/badge.svg)](https://github.com/ShareASmile/SkyTube/actions/workflows/android.yml)
 
 <p align="center">
   <a href="#features">Features</a> | 
