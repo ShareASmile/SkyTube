@@ -7,11 +7,20 @@ on:
       - master
       - dev
       - legacy
+    paths-ignore:
+      - 'README.md'
+      - 'fastlane/**'
+      - 'screenshots/**'
+      - '.github/ISSUE_TEMPLATE/**'
   pull_request:
     branches:
       - master
       - dev
       - legacy
+      - 'README.md'
+      - 'fastlane/**'
+      - 'screenshots/**'
+      - '.github/ISSUE_TEMPLATE/**'
 
 jobs:
   build:
