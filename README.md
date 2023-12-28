@@ -1,9 +1,9 @@
 # SkyTube
 **A copylefted libre / open source YouTube player for Android, without ads.**
 
-<a href="#download">![Download APK](https://img.shields.io/github/downloads/ram-on/SkyTube/total.svg?label=SkyTube+Extra+Downloads)</a>
+<a href="#download">![Download APK](https://img.shields.io/github/downloads/SkyTubeTeam/SkyTube/total.svg?label=SkyTube+Extra+Downloads)</a>
 <a href="https://hosted.weblate.org/engage/skytube/?utm_source=widget"> <img src="https://hosted.weblate.org/widgets/skytube/-/svg-badge.svg" alt="Translate"/> </a>
-[![Build Status](https://travis-ci.org/ram-on/SkyTube.svg?branch=master)](https://travis-ci.org/ram-on/SkyTube)
+[![Build Status](https://github.com/ShareASmile/SkyTube/workflows/CI/badge.svg?branch=legacy&event=push)](https://github.com/ShareASmile/SkyTube/actions)
 
 <p align="center">
   <a href="#features">Features</a> | 

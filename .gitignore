@@ -16,6 +16,7 @@
 bin/
 gen/
 app/extra/
+app/oss/
 *.iml
 
 # F-Droid files
