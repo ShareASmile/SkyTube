@@ -2,11 +2,12 @@
 <resources>
     <string name="update_available">Доступна новая версия</string>
     <string name="update_dialog_msg">Доступна новая версия SkyTube. Версия %s. будет установлена.</string>
-    <string name="up_to_date">Все свежие обновления установлены</string>
-    <string name="up_to_date_msg">Установлена самая свежая версия SkyTube.</string>
+    <string name="up_to_date">Установлена последняя версия</string>
+    <string name="up_to_date_msg">Установлена последняя версия SkyTube.</string>
     <string name="update">Обновить</string>
     <string name="later">Позже</string>
-    <string name="update_failure">Обновить приложение не получается.</string>
+    <string name="update_failure">Не удалось установить новую версию приложения.</string>
     <string name="downloading">Загрузка выполняется…</string>
     <string name="release_notes">Изменения в %s</string>
+    <string name="android_too_old">К сожалению, ваш Android слишком стар для обновления. Вам необходимо вручную установить \"SkyTube Legacy\"!</string>
 </resources>

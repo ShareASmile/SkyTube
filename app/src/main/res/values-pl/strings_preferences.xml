@@ -40,7 +40,7 @@
 \nThis program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
 \n
 \nYou should have received a copy of the GNU General Public License along with this program. If not, see &lt;http://www.gnu.org/licenses/&gt;</string>
-    <string name="i_agree">Wstecz</string>
+    <string name="i_agree">Zgadzam się</string>
     <string name="pref_other_category">Inne</string>
     <string name="pref_title_default_tab">Domyślna karta</string>
     <string name="pref_summary_default_tab">Karta do wyświetlenia po uruchomieniu SkyTube: %s</string>
@@ -72,8 +72,8 @@
     <string name="pref_title_choose_player">Odtwarzacz wideo</string>
     <string name="pref_summary_choose_player">Odtwarzacz wideo do użycia: %s</string>
     <string name="pref_import_export_category">Import/Eksport</string>
-    <string name="pref_title_subscriptions_alphabetical_order">Sortuj kanały od A do Z</string>
-    <string name="pref_summary_subscriptions_alphabetical_order">Wyświetla listę subskrybowanych kanałów jako A-B-C….</string>
+    <string name="pref_title_subscriptions_alphabetical_order">Sortuj kanały alfabetycznie</string>
+    <string name="pref_summary_subscriptions_alphabetical_order">Wyświetla listę subskrybowanych kanałów w kolejności alfabetycznej.</string>
     <string name="pref_category_downloads">Pobieranie</string>
     <string name="pref_title_download_to_separate_directories">Pobieraj do oddzielnych folderów</string>
     <string name="pref_summary_download_to_separate_directories">Filmy są zapisywane w folderach na podstawie nazwy kanału.</string>
@@ -103,7 +103,7 @@
     <string name="preferred_lang_updated">Odśwież filmy, aby używać nowego języka.</string>
     <string name="pref_title_lang_detection_video_filtering">Filtrowanie języka filmów</string>
     <string name="pref_summary_lang_detection_video_filtering">Wykorzystuje dużej ilości zasobów do wykrywania języka wideo i blokowania języka(ów), które nie są preferowane.</string>
-    <string name="setting_updated">Odśwież filmy, aby używać nowych ustawień.</string>
+    <string name="setting_updated">Aby zastosować nowe ustawienia, odśwież filmy.</string>
     <string name="pref_other_filters_category">Inne filtry</string>
     <string name="pref_title_low_views_filter">Wyświetlenia</string>
     <string name="pref_summary_low_views_filter">Odfiltruj filmy o niskiej liczbie wyświetleń: %s</string>
@@ -122,7 +122,7 @@
     <string name="pref_title_use_newpipe_backend">NewPipe back-end</string>
     <string name="pref_title_enable_immersive_mode">Tryb immersyjny</string>
     <string name="pref_summary_hide_tabs">Wybierz, które karty mają nie być wyświetlane. Wymagane jest ponowne uruchomienie.</string>
-    <string name="pref_summary_autocast">Urządzenie Chromecast do odtwarzania w SkyTube za pomocą innych aplikacji.</string>
+    <string name="pref_summary_autocast">Urządzenie Chromecast do odtwarzania innych aplikacji w SkyTube .</string>
     <string name="pref_title_chromecast_none">Brak</string>
     <string name="pref_summary_use_newpipe_backend">Używaj interfejsu API NewPipe, aby uzyskać dostęp do YouTube…</string>
     <string name="pref_summary_switch_volume_and_brightness">Umieszcza regulację głośności po prawej, a jasności po lewej stronie.</string>
@@ -167,4 +167,19 @@
     <string name="system_default_country">Kraj systemu</string>
     <string name="pref_key_use_newer_formats_title">Wypróbuj nowsze formaty wideo</string>
     <string name="pref_key_use_newer_formats_summary">Dźwięk i obraz mogą ucierpieć w starszych wersjach systemu Android bez wsparcia.</string>
+    <string name="pref_sponsorblock_category">SponsorBlock</string>
+    <string name="pref_title_enable_sponsorblock">Włącz SponsorBlock</string>
+    <string name="pref_details">Szczegóły</string>
+    <string name="pref_general">Główne</string>
+    <string name="pref_summary_enable_sponsorblock">Automatyczne pomijanie fragmentów filmów poświęconych sponsorom, przypomnieniom o interakcjach i nie tylko</string>
+    <string name="pref_title_credit_sponsorblock">Twórcy</string>
+    <string name="pref_summary_sponsorblock_category_list">Wybierz kategorie do pomijania</string>
+    <string name="pref_title_sponsorblock_category_list">Pomijaj fragmenty</string>
+    <string name="pref_summary_credit_sponsorblock">Korzysta z danych SponsorBlock z https://sponsor.ajay.app</string>
+    <string name="pref_title_open_issue">Otwórz zgłoszenie</string>
+    <string name="pref_summary_open_issue">Zaproponuj pomysł lub zgłoś błąd.</string>
+    <string name="pref_title_use_dislike_api">Przywróć licznik łapek w dół</string>
+    <string name="pref_summary_use_dislike_api">Przywróć licznik łapek w dół za pomocą returnyoutubedislike.com</string>
+    <string name="pref_title_playback_speed">Domyślna prędkość odtwarzania</string>
+    <string name="pref_summary_playback_speed">Domyślna prędkość odtwarzania: %s</string>
 </resources>

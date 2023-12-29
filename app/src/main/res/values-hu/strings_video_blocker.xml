@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="dislikes">%d százalékos nemtetszés</string>
+    <string name="dislikes">%d%% nemtetszés</string>
     <string name="channel_unwhitelist_error">Nem sikerült eltávolítani a csatornát a fehérlistáról.</string>
     <string name="channel_blacklist_error">Nem sikerült feketelistára tenni a csatornát.</string>
     <string name="channel_blacklisted">Frissítsen az új csatorna feketelista használatához.</string>
@@ -8,4 +8,5 @@
     <string name="configure">Beállítás</string>
     <string name="no_videos_blocked">Szeretné beállítani a videóblokkolót, hogy blokkolja vagy kiszűrje a videókat\?</string>
     <string name="blocked_videos">Blokkolt videók</string>
+    <string name="add_to_permitted">Csatornaengedély</string>
 </resources>
