@@ -122,7 +122,7 @@ public class SkyTubeApp extends MultiDexApplication {
 					.detectLeakedSqlLiteObjects()
 					.detectLeakedClosableObjects()
 					.penaltyLog()
-					.penaltyDeath()
+					//.penaltyDeath()
 					.build());
 		}
 		initChannels();
