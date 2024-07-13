@@ -167,8 +167,7 @@ dependencies {
         exclude group: 'com.google.http-client', module: 'google-http-client-jackson2'
     }
 
-    //implementation 'com.github.ShareASmile:NewPipeExtractor:1ef6c72e76'
-    implementation 'com.github.ShareASmile:NewPipeExtractor:v0.22.7.2'
+    implementation 'com.github.RSoulwin:NewPipeExtractor:d731ca24559172813df0fdebcbf10239cc26d6fc'
 
     implementation ('com.github.SkyTubeTeam.components:okhttp-client:0.0.3') {
         exclude group: 'com.github.SkyTubeTeam.NewPipeExtractor', module: 'extractor'
