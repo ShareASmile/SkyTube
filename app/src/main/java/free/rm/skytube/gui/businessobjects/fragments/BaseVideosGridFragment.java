@@ -17,17 +17,19 @@
 
 package free.rm.skytube.gui.businessobjects.fragments;
 
+import android.content.Context;
 import android.os.Bundle;
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
-import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
-import butterknife.BindView;
-import butterknife.ButterKnife;
-import free.rm.skytube.R;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
+
+import javax.annotation.Nonnull;
+
+import free.rm.skytube.businessobjects.Logger;
 import free.rm.skytube.businessobjects.db.PlaybackStatusDb;
 import free.rm.skytube.gui.businessobjects.adapters.VideoGridAdapter;
 import free.rm.skytube.gui.fragments.VideosGridFragment;
@@ -36,30 +38,34 @@ import free.rm.skytube.gui.fragments.VideosGridFragment;
  * A class that supports swipe-to-refresh on {@link VideosGridFragment}.
  */
 public abstract class BaseVideosGridFragment extends TabFragment implements SwipeRefreshLayout.OnRefreshListener {
-
-	protected final VideoGridAdapter  videoGridAdapter;
+	protected VideoGridAdapter videoGridAdapter;
 	private int updateCount = 0;
 
-	@BindView(R.id.swipeRefreshLayout)
 	protected SwipeRefreshLayout swipeRefreshLayout;
 
-	public BaseVideosGridFragment(VideoGridAdapter videoGrid) {
-		this.videoGridAdapter = videoGrid;
+	public BaseVideosGridFragment() {
 	}
 
-	@Nullable
-	@Override
-	public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-		videoGridAdapter.setContext(getActivity());
+    @Nullable
+    @Override
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+        Logger.w(this, "onCreateView called - call init(...) from the descendant- with videoGridAdapter=%s swipeRefreshLayout=%s", videoGridAdapter, swipeRefreshLayout);
+        initBase(container.getContext(), videoGridAdapter, swipeRefreshLayout);
+        return null;
+    }
 
-		View view = inflater.inflate(getLayoutResource(), container, false);
-
-		ButterKnife.bind(this, view);
-		swipeRefreshLayout.setOnRefreshListener(this);
-
-		return view;
-	}
-
+    protected void initBase(@NonNull Context context, VideoGridAdapter videoGridAdapterParam, @Nonnull SwipeRefreshLayout swipeRefreshLayoutParam) {
+        if (videoGridAdapterParam != null) {
+            this.videoGridAdapter = videoGridAdapterParam;
+        } else {
+            this.videoGridAdapter = new VideoGridAdapter();
+        }
+        videoGridAdapter.setContext(context);
+        this.swipeRefreshLayout = swipeRefreshLayoutParam;
+        if (isFragmentSelected()) {
+            videoGridAdapter.initializeList();
+        }
+    }
 
 	@Override
 	public void onRefresh() {
@@ -73,6 +79,10 @@ public abstract class BaseVideosGridFragment extends TabFragment implements Swip
 	@Override
 	public void onResume() {
 		super.onResume();
+		if (videoGridAdapter != null) {
+			videoGridAdapter.initializeList();
+		}
+
 		int newUpdateCounter = PlaybackStatusDb.getPlaybackStatusDb().getUpdateCounter();
 		if(newUpdateCounter != updateCount) {
 			videoGridAdapter.notifyDataSetChanged();
@@ -81,14 +91,23 @@ public abstract class BaseVideosGridFragment extends TabFragment implements Swip
 	}
 
 	@Override
-	public void onFragmentSelected() {
-		super.onFragmentSelected();
-		videoGridAdapter.initializeList();
+	public void onDestroyView() {
+		videoGridAdapter.onDestroy();
+		videoGridAdapter = null;
+		swipeRefreshLayout = null;
+		super.onDestroyView();
 	}
 
-	/**
-	 * Set the layout resource (e.g. Subscriptions resource layout, R.id.grid_view, ...etc).
-	 */
-	protected  abstract int getLayoutResource();
+	@Override
+	public void onDestroy() {
+		super.onDestroy();
+	}
 
+	@Override
+	public void onFragmentSelected() {
+		super.onFragmentSelected();
+		if (videoGridAdapter != null) {
+			videoGridAdapter.initializeList();
+		}
+	}
 }

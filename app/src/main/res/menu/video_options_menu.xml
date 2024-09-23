@@ -23,6 +23,12 @@
 		android:id="@+id/delete_download"
 		android:title="@string/delete_download"
 		android:visible="false"/>
+	<item
+		android:id="@+id/open_channel" android:visible="false"
+		android:title="@string/open_channel"/>
+	<item
+		android:id="@+id/subscribe_channel" android:visible="false"
+		android:title="@string/subscribe"/>
     <item
         android:id="@+id/view_thumbnail"
         android:title="@string/view_thumbnail"/>

@@ -2,8 +2,6 @@
 <resources>
     <string name="preferences">Préférences</string>
     <string name="pref_video_player_category">Lecteur vidéo</string>
-    <string name="pref_title_preferred_res">Résolution préférée</string>
-    <string name="pref_summary_preferred_res">Choix de la résolution par défaut : %s</string>
     <string name="pref_title_choose_player">Lecteur vidéo</string>
     <string name="pref_summary_choose_player">Lecteur vidéo à utiliser : %s</string>
     <string-array name="pref_video_players">
@@ -134,37 +132,24 @@
     <string name="pref_summary_updates">Rechercher des mises à jour.</string>
     <string name="pref_title_license">Licence</string>
     <string name="pref_summary_license">Licence Publique Générale GNU version 3</string>
-    <string name="app_license">
-		Copyright © 2015-2018  Ramon Mifsud\n
-
-		\nThis program is free software: you can redistribute it and/or modify
-		it under the terms of the GNU General Public License as published by
-		the Free Software Foundation (version 3 of the License).\n
-
-		\nThis program is distributed in the hope that it will be useful,
-		but WITHOUT ANY WARRANTY; without even the implied warranty of
-		MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-		GNU General Public License for more details.\n
-
-		\nYou should have received a copy of the GNU General Public License
-		along with this program.  If not, see &lt;http://www.gnu.org/licenses/&gt;
-	</string>
+    <string name="app_license">Copyright © 2015-2018 Ramon Mifsud
+\n 
+\nThis program is free software : you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation (version 3 of the License).
+\n 
+\nThis program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY ; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+\n 
+\nYou should have received a copy of the GNU General Public License along with this program. If not, see &lt;http ://www.gnu.org/licenses/&gt;</string>
     <string name="i_agree">J\'accepte</string>
     <string name="pref_category_downloads">Téléchargements</string>
     <string name="pref_title_download_to_separate_directories">Télécharger les vidéos dans des dossiers</string>
-    <string name="pref_category_mobile_network">Réseau mobile</string>
-    <string name="pref_title_preferred_res_mobile">Résolution préférée pour réseau mobile</string>
-    <string name="pref_summary_preferred_res_mobile">Sélectionnez la résolution que vous préférez pour la diffusion en continu via un réseau mobile (par exemple 4G) : %s</string>
     <string name="pref_title_disable_screen_gestures">Désactiver les gestes vidéo</string>
     <string name="pref_summary_disable_screen_gestures">Désactivez les gestes pour contrôler le volume, la luminosité et la recherche avant/arrière dans les vidéos.</string>
     <string name="pref_summary_download_to_separate_directories">Les vidéos sont téléchargées dans des dossiers en fonction du nom de la chaîne.</string>
     <string name="pref_summary_enable_video_blocker">Activer le bloqueur de vidéos.</string>
-    <string name="pref_video_download_preferred_resolution_summary">Les téléchargements vidéos préfèreront cette résolution : %s</string>
-    <string name="pref_video_download_preferred_resolution_title">Résolution de téléchargement vidéo préférée</string>
     <string name="pref_summary_video_download_folder">Les vidéos sont téléchargées dans ce dossier : %s</string>
     <string name="pref_title_video_download_folder">Dossier de téléchargement vidéo</string>
     <string name="pref_popup_title_video_download_folder">Choisissez un dossier</string>
-    <string name="pref_summary_use_newpipe_backend">Utilisez l\'API expérimentale NewPipe pour accéder à YouTube…</string>
+    <string name="pref_summary_use_newpipe_backend">Utilisez l\'API NewPipe pour accéder à YouTube…</string>
     <string name="pref_title_use_newpipe_backend">Utilisez le backend NewPipe</string>
     <string name="pref_summary_switch_volume_and_brightness">Place le contrôle du volume sur la droite et la luminosité sur la gauche.</string>
     <string name="pref_title_switch_volume_and_brightness">Geste de changement de volume et de luminosité</string>
@@ -179,7 +164,32 @@
     <string name="pref_title_autocast">AutoCast</string>
     <string name="pref_title_chromecast_none">Aucun</string>
     <string name="pref_chromecast_category">Chromecast</string>
-    <string name="pref_summary_mobile_network_usage">Que faire si vous utilisez un réseau mobile (comme la 4G) pour télécharger, regarder des vidéos : %s</string>
-    <string name="pref_title_mobile_network_usage">Utilisation du réseau mobile</string>
     <string name="key_preferences">préférences</string>
+    <string name="pref_summary_default_content_country">Afficher le contenu destiné à ce pays : %s</string>
+    <string name="pref_title_default_content_country">Pays de contenu par défaut</string>
+    <string name="pref_key_video_quality_for_downloads_summary">Optimiser pour : %s</string>
+    <string name="pref_key_video_quality_for_downloads_title">Sélection de la qualité vidéo pour les téléchargements</string>
+    <string name="pref_key_video_quality_metered_summary">Optimiser pour : %s</string>
+    <string name="pref_key_video_quality_metered_title">Sélection de la qualité vidéo avec compteur</string>
+    <string name="pref_key_video_quality_summary">Optimiser pour : %s</string>
+    <string name="pref_key_video_quality_title">Sélection de la qualité vidéo</string>
+    <string name="pref_video_download_minimum_resolution_summary">Les téléchargements de vidéos seront au moins dans cette résolution : %s</string>
+    <string name="pref_video_download_minimum_resolution_title">Résolution minimale de téléchargement des vidéos</string>
+    <string name="pref_video_download_maximum_resolution_summary">Les téléchargements de vidéos seront au maximum dans cette résolution : %s</string>
+    <string name="pref_video_download_maximum_resolution_title">Résolution maximale de téléchargement des vidéos</string>
+    <string name="pref_category_download_resolutions">Résolution vidéo pour le téléchargement</string>
+    <string name="pref_category_video_resolutions">Résolution vidéo</string>
+    <string name="system_default_country">Pays par défaut du système</string>
+    <string name="pref_summary_metered_network_usage">Que faire si vous utilisez un réseau avec compteur pour télécharger/regarder des vidéos : %s</string>
+    <string name="pref_title_metered_network_usage">Utilisation du réseau avec compteur</string>
+    <string name="pref_summary_maximum_res_metered">Sélectionnez votre résolution maximale lors de la diffusion en continu via un réseau avec compteur : %s</string>
+    <string name="pref_title_maximum_res_metered">Résolution maximale pour le réseau avec compteur</string>
+    <string name="pref_summary_minimum_res_metered">Sélectionnez votre résolution minimale lors de la diffusion en continu via un réseau à compteur : %s</string>
+    <string name="pref_title_minimum_res_metered">Résolution minimale pour le réseau avec compteur</string>
+    <string name="pref_category_metered_network">Réseau avec compteur</string>
+    <string name="no_resolution_specified">Aucune</string>
+    <string name="pref_summary_minimum_res">Sélectionnez votre résolution minimale : %s</string>
+    <string name="pref_title_minimum_res">Résolution minimale</string>
+    <string name="pref_summary_maximum_res">Sélectionnez votre résolution maximale : %s</string>
+    <string name="pref_title_maximum_res">Résolution maximale</string>
 </resources>

@@ -18,18 +18,18 @@
 package free.rm.skytube.gui.businessobjects.views;
 
 import android.content.Context;
-import androidx.annotation.Nullable;
-import androidx.appcompat.widget.AppCompatButton;
 import android.util.AttributeSet;
 import android.view.View;
 import android.widget.RemoteViews;
 
+import androidx.annotation.Nullable;
+import androidx.appcompat.widget.AppCompatButton;
+
 import free.rm.skytube.R;
 import free.rm.skytube.businessobjects.YouTube.POJOs.YouTubeChannel;
-import free.rm.skytube.businessobjects.YouTube.Tasks.GetBulkSubscriptionVideosTask;
-import free.rm.skytube.businessobjects.YouTube.Tasks.GetChannelVideosTask;
-import free.rm.skytube.businessobjects.YouTube.newpipe.NewPipeService;
-import free.rm.skytube.businessobjects.db.Tasks.SubscribeToChannelTask;
+import free.rm.skytube.businessobjects.YouTube.YouTubeTasks;
+import free.rm.skytube.businessobjects.db.DatabaseTasks;
+import io.reactivex.rxjava3.disposables.CompositeDisposable;
 
 /**
  * The (channel) subscribe button.
@@ -41,9 +41,9 @@ public class SubscribeButton extends AppCompatButton implements View.OnClickList
 	private boolean isUserSubscribed = false;
 
 	private YouTubeChannel channel;
-	private boolean fetchChannelVideosOnSubscribe = true;
 	private OnClickListener externalClickListener = null;
 
+	private final CompositeDisposable compositeDisposable = new CompositeDisposable();
 
 	public SubscribeButton(Context context, AttributeSet attrs) {
 		super(context, attrs);
@@ -58,16 +58,14 @@ public class SubscribeButton extends AppCompatButton implements View.OnClickList
 		if(externalClickListener != null) {
 			externalClickListener.onClick(SubscribeButton.this);
 		}
-		// Only fetch videos for this channel if fetchChannelVideosOnSubscribe is true AND the channel is not subscribed to yet.
-		if(fetchChannelVideosOnSubscribe && !isUserSubscribed) {
-			if (NewPipeService.isPreferred()) {
-				new GetBulkSubscriptionVideosTask(channel.getId(), null).executeInParallel();
-			} else {
-				new GetChannelVideosTask(channel.getId(), null, false, null).executeInParallel();
+		if(channel != null) {
+			// Only fetch videos for this channel if fetchChannelVideosOnSubscribe is true AND the channel is not subscribed to yet.
+			if (!isUserSubscribed) {
+				compositeDisposable.add(YouTubeTasks.refreshSubscribedChannel(channel.getId(), null).subscribe());
 			}
+			compositeDisposable.add(DatabaseTasks.subscribeToChannel(!isUserSubscribed,
+					this, getContext(), channel, true).subscribe());
 		}
-		if(channel != null)
-			new SubscribeToChannelTask(SubscribeButton.this, channel).executeInParallel();
 	}
 
 	@Override
@@ -76,18 +74,13 @@ public class SubscribeButton extends AppCompatButton implements View.OnClickList
 		super.setOnClickListener(this);
 	}
 
+	public void clearBackgroundTasks() {
+		compositeDisposable.clear();
+	}
+
 	public void setChannel(YouTubeChannel channel) {
 		this.channel = channel;
 	}
-
-	public void setFetchChannelVideosOnSubscribe(boolean fetchChannelVideosOnSubscribe) {
-		this.fetchChannelVideosOnSubscribe = fetchChannelVideosOnSubscribe;
-	}
-
-	public boolean isUserSubscribed() {
-		return isUserSubscribed;
-	}
-
 
 	/**
 	 * Set the button's state to subscribe (i.e. once clicked, the user indicates that he wants to

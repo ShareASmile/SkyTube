@@ -16,10 +16,11 @@
     <string name="loading">Bezig met laden…</string>
     <string name="video">Video</string>
     <string name="could_not_get_channel">De kanaalinformatie kan niet worden gedownload!</string>
-    <string name="hello_blank_fragment">Hallo blanco fragment</string>
     <string name="yes">Ja</string>
     <string name="no">Nee</string>
     <string name="search_channel">Kanaal doorzoeken</string>
     <string name="could_not_get_channel_detailed">De kanaalinformatie kan niet worden gedownload: %s</string>
     <string name="close">Sluiten</string>
+    <string name="trending_in">Populair (%s)</string>
+    <string name="recaptcha_challenge_requested">YouTube blokkeert onze netwerkverzoeken, dus moet je de reCaptcha gebruiken!</string>
 </resources>

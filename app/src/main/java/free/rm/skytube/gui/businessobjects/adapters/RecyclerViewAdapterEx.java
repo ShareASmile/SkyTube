@@ -18,13 +18,13 @@
 package free.rm.skytube.gui.businessobjects.adapters;
 
 import android.content.Context;
+
 import androidx.recyclerview.widget.RecyclerView;
 
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-
-import free.rm.skytube.businessobjects.utils.Predicate;
+import java.util.function.Predicate;
 
 /**
  * An extended class of {@link RecyclerView.Adapter} that accepts a context and a list of items.
@@ -32,15 +32,13 @@ import free.rm.skytube.businessobjects.utils.Predicate;
 public abstract class RecyclerViewAdapterEx<T, HolderType extends RecyclerView.ViewHolder> extends RecyclerView.Adapter<HolderType> {
 
 	private Context context;
-	protected List<T> list;
+	protected final List<T> list = new ArrayList<>();
 
-	public RecyclerViewAdapterEx(Context context) {
-		this(context, new ArrayList<T>());
+	public RecyclerViewAdapterEx() {
 	}
 
-	public RecyclerViewAdapterEx(Context context, List<T> list) {
+	public RecyclerViewAdapterEx(Context context) {
 		this.context  = context;
-		this.list     = list;
 	}
 
 	public Context getContext() {
@@ -70,8 +68,8 @@ public abstract class RecyclerViewAdapterEx<T, HolderType extends RecyclerView.V
 	 */
 	public void appendList(List<T> l) {
 		if (l != null  && !l.isEmpty()) {
-			this.list.addAll(l);
-			this.notifyDataSetChanged();
+			list.addAll(l);
+			notifyDataSetChanged();
 		}
 	}
 
@@ -129,11 +127,32 @@ public abstract class RecyclerViewAdapterEx<T, HolderType extends RecyclerView.V
 		notifyItemRangeRemoved(0, listSize);
 	}
 
+    protected void notifyItemChanged(T item) {
+        int idx = this.list.indexOf(item);
+        if (idx >= 0) {
+            this.notifyItemChanged(idx);
+        }
+    }
 
-	public Iterator<T> getIterator() {
-		return this.list.iterator();
-	}
+    /**
+     * Replace the first matching item with the given item
+     * @return the index of the new match, or -1 if none found 
+     */
+    protected int replace(Predicate<T> predicate, T newItem) {
+        for (int i=0;i<list.size();i++) {
+            T item = list.get(i);
+            if (predicate.test(item)) {
+                list.set(i, newItem);
+                this.notifyItemChanged(i);
+                return i;
+            }
+        }
+        return -1;
+    }
 
+    public Iterator<T> getIterator() {
+        return this.list.iterator();
+    }
 
 	@Override
 	public int getItemCount() {
@@ -145,12 +164,5 @@ public abstract class RecyclerViewAdapterEx<T, HolderType extends RecyclerView.V
 		return list.get(position);
 	}
 
-
-	/**
-	 * @return The list that represents items stored/displayed by this adapter.
-	 */
-	protected List<T> getList() {
-		return list;
-	}
 
 }

@@ -16,11 +16,12 @@
     <string name="num_videos">%d videó</string>
     <string name="playlists">Lejátszási listák</string>
     <string name="could_not_get_playlists">Nem lehet elérni a(z) %s lejátszási listát.</string>
-    <string name="hello_blank_fragment">Hello</string>
     <string name="loading">Betöltés …</string>
     <string name="yes">Igen</string>
     <string name="no">Nem</string>
     <!-- TODO: Remove or change this placeholder text -->
     <string name="search_channel">Csatornák keresése</string>
     <string name="close">Bezárás</string>
+    <string name="trending_in">Felkapott (%s)</string>
+    <string name="recaptcha_challenge_requested">A YouTube blokkolja hálózati kéréseinket, meg kell oldania a reCaptcha feladatot!</string>
 </resources>

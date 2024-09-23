@@ -12,15 +12,16 @@
     <string name="LIVE">LIVE</string>
     <string name="featured">Featured</string>
     <string name="most_popular">Most Popular</string>
+    <string name="trending_in">Trending (%s)</string>
     <string name="video">Video</string>
     <string name="videos">Videos</string>
     <string name="num_videos">%d videos</string>
     <string name="playlists">Playlists</string>
     <string name="could_not_get_playlists">Could not get %s playlists.</string>
+    <string name="recaptcha_challenge_requested">YouTube blocks our network requests, You need to solve the reCaptcha challenge!</string>
     <string name="close">Close</string>
     <string name="loading">Loading …</string>
     <string name="yes">Yes</string>
     <string name="no">No</string>
     <string name="search_channel">Search channel</string>
-    <!-- TODO: Remove or change this placeholder text -->
 </resources>

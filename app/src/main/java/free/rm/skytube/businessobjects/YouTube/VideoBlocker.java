@@ -42,7 +42,6 @@ import free.rm.skytube.app.SkyTubeApp;
 import free.rm.skytube.businessobjects.Logger;
 import free.rm.skytube.businessobjects.YouTube.POJOs.CardData;
 import free.rm.skytube.businessobjects.YouTube.POJOs.ChannelView;
-import free.rm.skytube.businessobjects.YouTube.POJOs.YouTubeChannel;
 import free.rm.skytube.businessobjects.YouTube.POJOs.YouTubeVideo;
 import free.rm.skytube.businessobjects.db.ChannelFilteringDb;
 
@@ -136,8 +135,8 @@ public class VideoBlocker {
 		final List<String>      whitelistedChannelIds = !isChannelBlacklistEnabled ? ChannelFilteringDb.getChannelFilteringDb().getWhitelistedChannelsIdsList() : null;
 
 		for (ChannelView channel : channels) {
-			if ( !((isChannelBlacklistEnabled  &&  filterByBlacklistedChannels(channel.getId(), blacklistedChannelIds))
-					|| (!isChannelBlacklistEnabled  &&  filterByWhitelistedChannels(channel.getId(), whitelistedChannelIds))) ) {
+			if ( !(isChannelBlacklistEnabled ? filterByBlacklistedChannels(channel.getId(), blacklistedChannelIds)
+					: filterByWhitelistedChannels(channel.getId(), whitelistedChannelIds)) ) {
 				filteredChannels.add(channel);
 			}
 		}

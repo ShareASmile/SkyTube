@@ -27,8 +27,6 @@ import android.view.HapticFeedbackConstants;
 import android.view.MotionEvent;
 import android.widget.TextView;
 
-
-import java.lang.IndexOutOfBoundsException;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -37,7 +35,7 @@ class TouchableMovementMethod extends LinkMovementMethod {
         void onClick(URLSpan span, boolean longClick);
     }
 
-    Object lock = new Object();
+    final Object lock = new Object();
     URLSpan pressedSpan;
     Set<URLSpan> touchedSpans = new HashSet<>();
     boolean touched;

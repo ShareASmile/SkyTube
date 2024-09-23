@@ -7,13 +7,20 @@ import android.database.sqlite.SQLiteDatabase;
 
 import androidx.annotation.NonNull;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 
 import free.rm.skytube.app.SkyTubeApp;
+import free.rm.skytube.businessobjects.Logger;
+import free.rm.skytube.businessobjects.YouTube.POJOs.CardData;
 import free.rm.skytube.businessobjects.YouTube.POJOs.YouTubeVideo;
 import free.rm.skytube.businessobjects.interfaces.VideoPlayStatusUpdateListener;
+import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
+import io.reactivex.rxjava3.core.Maybe;
+import io.reactivex.rxjava3.core.Single;
+import io.reactivex.rxjava3.disposables.Disposable;
+import io.reactivex.rxjava3.schedulers.Schedulers;
 
 /**
  * A database (DB) that stores video playback history
@@ -26,7 +33,8 @@ public class PlaybackStatusDb extends SQLiteOpenHelperEx {
 	private int updateCounter = 0;
 	private static final String DATABASE_NAME = "playbackhistory.db";
 
-	private List<VideoPlayStatusUpdateListener> listeners = new ArrayList<>();
+	private final Set<VideoPlayStatusUpdateListener> listeners = new HashSet<>();
+
 	public static synchronized PlaybackStatusDb getPlaybackStatusDb() {
 		if (playbackStatusDb == null) {
 			playbackStatusDb = new PlaybackStatusDb(SkyTubeApp.getContext());
@@ -39,16 +47,11 @@ public class PlaybackStatusDb extends SQLiteOpenHelperEx {
 		super(context, DATABASE_NAME, null, DATABASE_VERSION);
 	}
 
-	@Override
-	protected void clearDatabaseInstance() {
-
-	}
-
 	public void deleteAllPlaybackHistory() {
 		getWritableDatabase().delete(PlaybackStatusTable.TABLE_NAME, null, null);
 		playbackHistoryMap = null;
 		updateCounter++;
-		onUpdated();
+		onUpdated(null);
 	}
 
 	@Override
@@ -70,7 +73,7 @@ public class PlaybackStatusDb extends SQLiteOpenHelperEx {
 	 * @return {@link VideoWatchedStatus} of the passed video, which contains the position (in ms) and whether or not the video
 	 * 					has been (completely) watched.
 	 */
-	public VideoWatchedStatus getVideoWatchedStatus(@NonNull String videoId) {
+	public synchronized VideoWatchedStatus getVideoWatchedStatus(@NonNull String videoId) {
 		if(playbackHistoryMap == null) {
 			Cursor cursor = getReadableDatabase().query(
 							PlaybackStatusTable.TABLE_NAME,
@@ -98,6 +101,12 @@ public class PlaybackStatusDb extends SQLiteOpenHelperEx {
 		return playbackHistoryMap.get(videoId);
 	}
 
+    public Maybe<VideoWatchedStatus> getVideoWatchedStatusAsync(@NonNull String videoId) {
+        return Maybe.fromCallable(() -> getVideoWatchedStatus(videoId))
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread());
+    }
+
 	/**
 	 * Set the position (in ms) of the passed {@link YouTubeVideo}. If the position is less than 5 seconds,
 	 * don't do anything. If the position is greater than or equal to 90% of the duration of the video, set
@@ -105,21 +114,33 @@ public class PlaybackStatusDb extends SQLiteOpenHelperEx {
 	 *
 	 * @param video {@link YouTubeVideo}
 	 * @param position Number of milliseconds
-	 * @return boolean on whether the database was updated successfully.
+	 * @return Disposable which contains the background task.
 	 */
-	public boolean setVideoPosition(YouTubeVideo video, long position) {
+	public Disposable setVideoPositionInBackground(YouTubeVideo video, long position) {
 		// Don't record the position if it's < 5 seconds
-		if(position < 5000)
-			return false;
+		if (SkyTubeApp.getSettings().isPlaybackStatusEnabled() && position >= 5000) {
+			boolean watched = false;
+			// If the user has stopped watching the video and the position is greater than 90% of the duration, mark the video as watched and reset position
+			if((float)position / (video.getDurationInSeconds()*1000) >= 0.9) {
+				watched = true;
+				position = 0;
+			}
+			final long positionValue = position;
+			final boolean watchedValue = watched;
+			return Single.fromCallable(() -> saveVideoWatchStatus(video.getId(), positionValue, watchedValue))
+					.subscribeOn(Schedulers.io())
+					.observeOn(AndroidSchedulers.mainThread())
+					.subscribe((success) -> {
+						Logger.i(this, "onUpdated " + success);
 
-		boolean watched = false;
-		// If the user has stopped watching the video and the position is greater than 90% of the duration, mark the video as watched and reset position
-		if((float)position / (video.getDurationInSeconds()*1000) >= 0.9) {
-			watched = true;
-			position = 0;
+						if (success) {
+							onUpdated(video);
+						}
+					});
+		} else {
+			return Disposable.empty();
 		}
 
-		return saveVideoWatchStatus(video.getId(), position, watched);
 	}
 
 	/**
@@ -130,8 +151,21 @@ public class PlaybackStatusDb extends SQLiteOpenHelperEx {
 	 * @param watched boolean on whether or not the passed video has been watched
 	 * @return boolean on whether the database was updated successfully.
 	 */
-	public boolean setVideoWatchedStatus(YouTubeVideo video, boolean watched) {
-		return saveVideoWatchStatus(video.getId(), 0, watched);
+	public Maybe<Boolean> setVideoWatchedStatusInBackground(YouTubeVideo video, boolean watched) {
+		if (SkyTubeApp.getSettings().isPlaybackStatusEnabled()) {
+			return Maybe.fromCallable(() -> saveVideoWatchStatus(video.getId(), 0, watched))
+					.subscribeOn(Schedulers.io())
+					.observeOn(AndroidSchedulers.mainThread())
+					.doOnSuccess((success) -> {
+						Logger.i(this, "onUpdated " + success);
+
+                        if (success) {
+                            onUpdated(video);
+                        }
+					});
+		} else {
+			return Maybe.empty();
+		}
 	}
 
 	private boolean saveVideoWatchStatus(String videoId, long position, boolean watched) {
@@ -153,21 +187,20 @@ public class PlaybackStatusDb extends SQLiteOpenHelperEx {
 		status.position = position;
 		status.watched = watched;
 
-		onUpdated();
 
 		return addSuccessful;
 	}
 
-	private void onUpdated() {
-		for(VideoPlayStatusUpdateListener listener : listeners) {
-			listener.onVideoStatusUpdated();
-		}
-	}
+    private void onUpdated(CardData cardData) {
+        for(VideoPlayStatusUpdateListener listener : listeners) {
+            listener.onVideoStatusUpdated(cardData);
+        }
+    }
 
 	/**
 	 * Class that contains the position and watched status of a video.
 	 */
-	public class VideoWatchedStatus {
+	public static class VideoWatchedStatus {
 		public VideoWatchedStatus() {}
 		public VideoWatchedStatus(long position, boolean watched) {
 			this.position = position;
@@ -206,9 +239,7 @@ public class PlaybackStatusDb extends SQLiteOpenHelperEx {
 	}
 
 	public void addListener(VideoPlayStatusUpdateListener listener) {
-		if(!listeners.contains(listener)) {
-			listeners.add(listener);
-		}
+		listeners.add(listener);
 	}
 
 	public void removeListener(VideoPlayStatusUpdateListener listener) {

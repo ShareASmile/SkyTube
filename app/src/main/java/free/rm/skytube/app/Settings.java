@@ -18,12 +18,23 @@
 package free.rm.skytube.app;
 
 import android.content.SharedPreferences;
-import androidx.preference.PreferenceManager ;
+import android.os.Build;
+import android.os.Environment;
 
 import androidx.annotation.StringRes;
+import androidx.preference.PreferenceManager;
+
+import java.io.File;
+import java.util.Collections;
+import java.util.Locale;
+import java.util.Set;
 
 import free.rm.skytube.R;
 import free.rm.skytube.app.enums.Policy;
+import free.rm.skytube.businessobjects.Logger;
+import free.rm.skytube.businessobjects.YouTube.VideoStream.VideoQuality;
+import free.rm.skytube.businessobjects.YouTube.VideoStream.VideoResolution;
+import free.rm.skytube.gui.fragments.SubscriptionsFeedFragment;
 
 /**
  * Type safe wrapper to access the various preferences.
@@ -32,9 +43,53 @@ public class Settings {
     private final SkyTubeApp app;
     private static final String TUTORIAL_COMPLETED = "YouTubePlayerActivity.TutorialCompleted";
     private static final String LATEST_RELEASE_NOTES_DISPLAYED = "Settings.LATEST_RELEASE_NOTES_DISPLAYED";
+    private static final String FLAG_REFRESH_FEED_FROM_CACHE = "SubscriptionsFeedFragment.FLAG_REFRESH_FEED_FROM_CACHE";
+    private static final String FLAG_REFRESH_FEED_FULL = "SubscriptionsFeedFragment.FLAG_REFRESH_FEED_FULL";
+    /** Refresh the feed (by querying the YT servers) after 3 hours since the last check. */
+    private static final int    REFRESH_TIME_HOURS = 3;
+    private static final long   REFRESH_TIME_IN_MS = REFRESH_TIME_HOURS * (1000L*3600L);
 
     Settings(SkyTubeApp app) {
         this.app = app;
+    }
+
+    void migrate() {
+        SharedPreferences sharedPreferences = getSharedPreferences();
+        migrate(sharedPreferences, "pref_preferred_resolution", R.string.pref_key_maximum_res);
+        migrate(sharedPreferences, "pref_preferred_resolution_mobile", R.string.pref_key_maximum_res_mobile);
+        migrate(sharedPreferences, "pref_key_video_preferred_resolution", R.string.pref_key_video_download_maximum_resolution);
+        setDefault(sharedPreferences, R.string.pref_key_video_quality, VideoQuality.BEST_QUALITY.name());
+        setDefault(sharedPreferences, R.string.pref_key_video_quality_for_downloads, VideoQuality.BEST_QUALITY.name());
+        setDefault(sharedPreferences, R.string.pref_key_video_quality_on_mobile, VideoQuality.LEAST_BANDWITH.name());
+        setDefault(sharedPreferences, R.string.pref_key_use_newer_formats, Build.VERSION.SDK_INT > 16);
+    }
+
+    private void migrate(SharedPreferences sharedPreferences, String oldKey, @StringRes int newKey) {
+        String oldValue = sharedPreferences.getString(oldKey, null);
+        if (oldValue != null) {
+            String newKeyStr = app.getString(newKey);
+            Logger.i(this, "Migrate %s : %s into %s", oldKey, oldValue, newKeyStr);
+            final SharedPreferences.Editor editor = sharedPreferences.edit();
+            editor.putString(newKeyStr, oldValue);
+            editor.remove(oldKey);
+            editor.commit();
+        }
+    }
+
+    private void setDefault(SharedPreferences sharedPreferences, @StringRes int key, Object defaultValue) {
+        String keyStr = app.getString(key);
+        if (!sharedPreferences.contains(keyStr)) {
+            final SharedPreferences.Editor editor = sharedPreferences.edit();
+            Logger.i(this, "Set default %s to %s", keyStr, defaultValue);
+            if (defaultValue instanceof String) {
+                editor.putString(keyStr, (String) defaultValue);
+            } else if (defaultValue instanceof Boolean) {
+                editor.putBoolean(keyStr, (Boolean) defaultValue);
+            } else {
+                throw new IllegalArgumentException("Default value is " + defaultValue + " for " + keyStr);
+            }
+            editor.commit();
+        }
     }
 
     /**
@@ -51,10 +106,69 @@ public class Settings {
         return getPreference(R.string.pref_key_download_to_separate_directories,false);
     }
 
-    public Policy getWarningMobilePolicy() {
+    public Set<String> getHiddenTabs() {
+        return getPreference(R.string.pref_key_hide_tabs, Collections.emptySet());
+    }
+
+    public Policy getWarningMeteredPolicy() {
         String currentValue = getSharedPreferences().getString(getStr(R.string.pref_key_mobile_network_usage_policy),
-                getStr(R.string.pref_mobile_network_usage_value_ask));
+                getStr(R.string.pref_metered_network_usage_value_ask));
         return Policy.valueOf(currentValue.toUpperCase());
+    }
+
+    public String getPreferredContentCountry() {
+        String defaultCountryCode = Locale.getDefault().getCountry();
+        String code = getPreference(R.string.pref_key_default_content_country, "");
+        Logger.i(this, "Default country code is %s - app selection: %s", defaultCountryCode, code);
+        return (code != null && !code.isEmpty()) ? code : defaultCountryCode;
+    }
+
+    public boolean isPlaybackStatusEnabled() {
+        return !getPreference(R.string.pref_key_disable_playback_status, false);
+    }
+
+    /**
+     * Gets the policy which defines the desired video resolution by the user in the app preferences.
+     *
+     * @return Desired {@link StreamSelectionPolicy}.
+     */
+    public StreamSelectionPolicy getDesiredVideoResolution(boolean forDownload, boolean onMetered) {
+        SharedPreferences prefs = getSharedPreferences();
+        String maxKey = SkyTubeApp.getStr(forDownload ? R.string.pref_key_video_download_maximum_resolution : R.string.pref_key_maximum_res);
+        String maxResIdValue = prefs.getString(maxKey, Integer.toString(VideoResolution.DEFAULT_VIDEO_RES_ID));
+
+        String minKey = SkyTubeApp.getStr(forDownload ? R.string.pref_key_video_download_minimum_resolution : R.string.pref_key_minimum_res);
+        String minResIdValue = prefs.getString(minKey, null);
+
+        String qualityKey = SkyTubeApp.getStr(forDownload ? R.string.pref_key_video_quality_for_downloads : R.string.pref_key_video_quality);
+        String qualityValue = prefs.getString(qualityKey, null);
+
+        // if on metered network, use the preferred resolution under metered network if defined
+        if (onMetered) {
+            // default res for mobile network = that of wifi
+            maxResIdValue = prefs.getString(SkyTubeApp.getStr(R.string.pref_key_maximum_res_mobile), maxResIdValue);
+            minResIdValue = prefs.getString(SkyTubeApp.getStr(R.string.pref_key_minimum_res_mobile), minResIdValue);
+            qualityValue = prefs.getString(SkyTubeApp.getStr(R.string.pref_key_video_quality_on_mobile), qualityValue);
+        }
+        VideoResolution maxResolution = VideoResolution.videoResIdToVideoResolution(maxResIdValue);
+        VideoResolution minResolution = VideoResolution.videoResIdToVideoResolution(minResIdValue);
+        VideoQuality quality = VideoQuality.valueOf(qualityValue);
+
+        boolean useNewFormats = prefs.getBoolean(SkyTubeApp.getStr(R.string.pref_key_use_newer_formats), false);
+
+        return new StreamSelectionPolicy(!forDownload && useNewFormats, maxResolution, minResolution, quality);
+    }
+
+    public StreamSelectionPolicy getDesiredVideoResolution(boolean forDownload) {
+        return getDesiredVideoResolution(forDownload, SkyTubeApp.isActiveNetworkMetered());
+    }
+
+    public boolean isDisableSearchHistory() {
+        return getSharedPreferences().getBoolean(SkyTubeApp.getStr(R.string.pref_key_disable_search_history), false);
+    }
+
+    public int getFeedUpdaterInterval() {
+        return Integer.parseInt(getPreference(R.string.pref_key_feed_notification, "0"));
     }
 
     public void setWarningMobilePolicy(Policy warnPolicy) {
@@ -71,6 +185,43 @@ public class Settings {
 
     public boolean isSwitchVolumeAndBrightness() {
         return getPreference(R.string.pref_key_switch_volume_and_brightness, false);
+    }
+
+    /**
+     * Instruct the {@link SubscriptionsFeedFragment} to refresh the subscriptions feed.
+     *
+     * This might occur due to user subscribing/unsubscribing to a channel.
+     */
+    public void setRefreshSubsFeedFromCache(boolean flag) {
+        setPreference(FLAG_REFRESH_FEED_FROM_CACHE, flag);
+    }
+
+    public boolean isRefreshSubsFeedFromCache() {
+        return getPreference(FLAG_REFRESH_FEED_FROM_CACHE, false);
+    }
+
+    /**
+     * Instruct the {@link SubscriptionsFeedFragment} to refresh the subscriptions feed by retrieving
+     * any newly published videos from the YT servers.
+     *
+     * This might occur due to user just imported the subbed channels from YouTube (XML file).
+     */
+    public void setRefreshSubsFeedFull(boolean flag) {
+        setPreference(FLAG_REFRESH_FEED_FULL, flag);
+    }
+
+    public boolean isRefreshSubsFeedFull() {
+        return getPreference(FLAG_REFRESH_FEED_FULL, false);
+    }
+
+    public boolean isFullRefreshTimely() {
+        // Only do an automatic refresh of subscriptions if it's been more than three hours since the last one was done.
+        Long subscriptionsLastUpdated = getFeedsLastUpdateTime();
+        if (subscriptionsLastUpdated == null) {
+            return true;
+        }
+        long threeHoursAgo = System.currentTimeMillis() - REFRESH_TIME_IN_MS;
+        return subscriptionsLastUpdated <= threeHoursAgo;
     }
 
     /**
@@ -123,6 +274,11 @@ public class Settings {
         return getPreference(R.string.pref_key_video_download_folder, defaultValue);
     }
 
+    public File getDownloadParentFolder() {
+        String parentDirectory = getDownloadFolder(null);
+        return parentDirectory != null ? new File(parentDirectory) : Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES);
+    }
+
     private void setPreference(@StringRes int resId, boolean value) {
         setPreference(getStr(resId), value);
     }
@@ -150,15 +306,19 @@ public class Settings {
     }
 
     private String getPreference(@StringRes int resId, String defaultValue) {
-        return getSharedPreferences().getString(app.getStr(resId), defaultValue);
+        return getSharedPreferences().getString(SkyTubeApp.getStr(resId), defaultValue);
     }
 
     private boolean getPreference(@StringRes int resId, boolean defaultValue) {
-        return getSharedPreferences().getBoolean(app.getStr(resId), defaultValue);
+        return getSharedPreferences().getBoolean(SkyTubeApp.getStr(resId), defaultValue);
     }
 
     private boolean getPreference(String preference, boolean defaultValue) {
         return getSharedPreferences().getBoolean(preference, defaultValue);
+    }
+
+    private Set<String> getPreference(@StringRes int resId, Set<String> defaultValue) {
+        return getSharedPreferences().getStringSet(SkyTubeApp.getStr(resId), defaultValue);
     }
 
     private SharedPreferences getSharedPreferences() {

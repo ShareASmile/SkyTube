@@ -22,12 +22,11 @@ import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
-import androidx.annotation.Nullable;
-import com.google.android.material.floatingactionbutton.FloatingActionButton;
-import androidx.appcompat.app.AppCompatActivity;
 import android.view.View;
-import android.widget.ImageView;
 import android.widget.Toast;
+
+import androidx.annotation.Nullable;
+import androidx.appcompat.app.AppCompatActivity;
 
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.load.DataSource;
@@ -40,6 +39,7 @@ import java.io.Serializable;
 import free.rm.skytube.R;
 import free.rm.skytube.businessobjects.FileDownloader;
 import free.rm.skytube.businessobjects.YouTube.POJOs.YouTubeVideo;
+import free.rm.skytube.databinding.ActivityVideoThumbnailBinding;
 
 import static free.rm.skytube.app.SkyTubeApp.getContext;
 
@@ -47,19 +47,18 @@ import static free.rm.skytube.app.SkyTubeApp.getContext;
  * An activity that allows the user to view the thumbnail of a YouTube video.
  */
 public class ThumbnailViewerActivity extends AppCompatActivity {
-
-	private YouTubeVideo youTubeVideo;
-
 	public static final String YOUTUBE_VIDEO = "ThumbnailViewerActivity.YouTubeVideo";
 
+	private YouTubeVideo youTubeVideo;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
-		setContentView(R.layout.activity_video_thumbnail);
 
-		FloatingActionButton fab = findViewById(R.id.fab);
-		fab.setOnClickListener(view -> {
+		final ActivityVideoThumbnailBinding binding = ActivityVideoThumbnailBinding.inflate(getLayoutInflater());
+		setContentView(binding.getRoot());
+
+		binding.fab.setOnClickListener(view ->
 			// download the thumbnail
 			new ThumbnailDownloader()
 					.setRemoteFileUrl(getThumbnailUrl())
@@ -68,53 +67,52 @@ public class ThumbnailViewerActivity extends AppCompatActivity {
 					.setDescription(getString(R.string.thumbnail) + " ― " + youTubeVideo.getChannelName())
 					.setOutputFileName(youTubeVideo.getTitle())
 					.setAllowedOverRoaming(true)
-					.displayPermissionsActivity(ThumbnailViewerActivity.this);
-		});
+					.displayPermissionsActivity(ThumbnailViewerActivity.this)
+		);
 
 		Intent intent = getIntent();
 		youTubeVideo = (YouTubeVideo) intent.getExtras().getSerializable(YOUTUBE_VIDEO);
 
-		ImageView   thumbnailImageView = findViewById(R.id.thumbnail_image_view);
-		final View  loadingVideoView = findViewById(R.id.loadingVideoView);
-
-		thumbnailImageView.setOnClickListener(v -> finish());
+		binding.thumbnailImageView.setOnClickListener(v -> finish());
 
 		Glide.with(this)
 				.load(getThumbnailUrl())
 				.listener(new RequestListener<Drawable>() {
 					@Override
 					public boolean onLoadFailed(@Nullable GlideException e, Object model, Target<Drawable> target, boolean isFirstResource) {
-						loadingVideoView.setVisibility(View.GONE);
+						binding.loadingVideoView.setVisibility(View.GONE);
 						return false;
 					}
 
 					@Override
 					public boolean onResourceReady(Drawable resource, Object model, Target<Drawable> target, DataSource dataSource, boolean isFirstResource) {
-						loadingVideoView.setVisibility(View.GONE);
+						binding.loadingVideoView.setVisibility(View.GONE);
 						return false;
 					}
 				})
-				.into(thumbnailImageView);
+				.into(binding.thumbnailImageView);
 	}
-
 
 	private String getThumbnailUrl() {
 		return youTubeVideo.getThumbnailMaxResUrl() != null  ?  youTubeVideo.getThumbnailMaxResUrl()  :  youTubeVideo.getThumbnailUrl();
 	}
 
-
-
 	////////////////////////////////////////////////////////////////////////////////////////////////
-
 
 	/**
 	 * Downloads a video thumbnail.
 	 */
 	private static class ThumbnailDownloader extends FileDownloader implements Serializable {
-
 		@Override
 		public void onFileDownloadStarted() {
 		}
+
+        @Override
+        public void onDownloadStartFailed(String downloadName, final RuntimeException runtimeException) {
+            Toast.makeText(getContext(),
+                    String.format(getContext().getString(R.string.download_failed_because), downloadName, runtimeException.getMessage()),
+                    Toast.LENGTH_LONG).show();
+        }
 
 		@Override
 		public void onFileDownloadCompleted(boolean success, Uri localFileUri) {
@@ -130,7 +128,5 @@ public class ThumbnailViewerActivity extends AppCompatActivity {
 					R.string.external_storage_not_available,
 					Toast.LENGTH_LONG).show();
 		}
-
 	}
-
 }

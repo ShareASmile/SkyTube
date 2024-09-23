@@ -20,26 +20,31 @@ package free.rm.skytube.businessobjects;
 import android.util.Log;
 
 public class Logger {
+	private final static String TAG = "SkyTube_";
 
 	public static void i(Object obj, String format, Object ... args) {
-		Log.i(obj.getClass().getSimpleName(), format(format, args));
+		Log.i(TAG + obj.getClass().getSimpleName(), format(format, args));
 	}
 
 	public static void d(Object obj, String format, Object ... args) {
-		Log.d(obj.getClass().getSimpleName(), format(format, args));
+		Log.d(TAG + obj.getClass().getSimpleName(), format(format, args));
 	}
 
 	public static void w(Object obj, String format, Object ... args) {
-		Log.w(obj.getClass().getSimpleName(), format(format, args));
+		Log.w(TAG + obj.getClass().getSimpleName(), format(format, args));
 	}
 
 	public static void e(Object obj, String msg, Throwable tr) {
-		Log.e(obj.getClass().getSimpleName(), msg, tr);
+		Log.e(TAG + obj.getClass().getSimpleName(), msg, tr);
 	}
 
 	public static void e(Object obj, String format, Object ... args) {
-		Log.e(obj.getClass().getSimpleName(), format(format, args));
+		Log.e(TAG + obj.getClass().getSimpleName(), format(format, args));
 	}
+
+    public static void e(Object obj, Throwable error, String format, Object ... args) {
+        Log.e(TAG + obj.getClass().getSimpleName(), format(format, args), error);
+    }
 
 	private static String format(String format, Object... args) {
 		return args.length > 0 ? String.format(format, args) : format;

@@ -19,15 +19,15 @@
 		&lt;br/&gt;
 		&lt;br/&gt;
 		"%s".</string>
-    <string name="mobile_data">Mobile Data</string>
-    <string name="warning_mobile_network_play">Your device is not connected to a Wi-Fi network. To avoid potential extra data usage charges, it is recommended to connect to a Wi-Fi network. Play video anyway\?</string>
-    <string name="warning_mobile_network_disable">Never ask again.</string>
-    <string name="mobile_data_blocked_by_policy">Download blocked, because your device is not connected to a Wi-Fi network.</string>
+    <string name="metered_network">Metered Network</string>
+    <string name="warning_metered_network_play">Your device is connected to a metered network. To avoid potential extra data usage charges, it is recommended to connect to an unmetered network. Play video anyway\?</string>
+    <string name="warning_metered_network_disable">Never ask again.</string>
+    <string name="metered_network_blocked_by_policy">Download blocked because your device is connected to a metered network.</string>
     <string name="play_video">Play Video</string>
     <string name="warning_live_video">Cannot play live streams for now. Open live stream in another app?</string>
     <string name="ratings_disabled">Ratings disabled</string>
     <string name="loading_video">Loading video…</string>
-    <string name="get_new_video_steam">New Stream</string>
+    <string name="reload_video">Reload Video</string>
     <string name="open_in_browser">Open in web browser</string>
     <string name="open_with">Open with…</string>
     <string name="share">Share</string>
